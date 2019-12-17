@@ -1,4 +1,4 @@
-package zabbix
+package zabbixclient
 
 import (
 	reflector "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixutil"
