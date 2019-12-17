@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	zabbix "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
 	"github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/provisioner"
 	"github.com/neogan74/zabbix-alertmanager/zabbixsender/zabbixsnd"
 	"github.com/neogan74/zabbix-alertmanager/zabbixsender/zabbixsvc"
@@ -189,16 +190,46 @@ func main() {
 			log.Fatalf("Error with body: %v\n", err)
 		}
 		// log.Infof("Targets: %v\n", data)
-
-		var targets TargetsList
-		err = json.Unmarshal(data, &targets)
+		var targets []string
+		var targetsjs TargetsList
+		err = json.Unmarshal(data, &targetsjs)
 		if err != nil {
 			log.Fatalf("Error while JSON unmarshal %s", err)
 		}
-		log.Infof("Targets: %v\n", targets)
-		for _, v := range targets.Data.ActiveTargets {
+		log.Infof("Targets: %v\n", targetsjs)
+		for _, v := range targetsjs.Data.ActiveTargets {
+			targets = append(targets, v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")])
+			// log.Infof("%v\n", v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")])
+		}
+		log.Infof("targets list: %v", targets)
+		//Create hosts in zabbix
+		// vars
+		url := "http://51.15.213.9:8144/api_jsonrpc.php"
+		user := "prom2zbx"
+		passwd := "1711"
 
-			log.Infof("%v\n", v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")])
+		api := zabbix.NewAPI(url)
+		api.SetClient(&http.Client{
+			Transport: http.DefaultTransport,
+		})
+		_, err = api.Login(user, passwd)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var newHosts []zabbix.Host
+		// var hosts []interface{}
+		for _, trg := range targets {
+			q, err := api.HostGetByHost(trg)
+			if err != nil {
+				log.Infof("Error to get hosts %s from Zabbix API: %s", err, trg)
+				// createHost here
+				nh := &zabbix.Host{Host: trg}
+				newHosts = append(newHosts, *nh)
+			}
+
+			log.Infof("%v\n%v\n", q, newHosts)
+
 		}
 
 	}
