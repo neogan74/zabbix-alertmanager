@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// Some convertors
 // Converts value to kind. Panics if it can't be done.
 type Converter func(value interface{}, kind reflect.Kind) interface{}
 
