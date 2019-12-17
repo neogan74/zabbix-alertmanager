@@ -3,12 +3,14 @@ package provisioner
 import (
 	"strings"
 
-	zabbix "github.com/devopyio/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
+	zabbix "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
 	log "github.com/sirupsen/logrus"
 )
 
+//State ..
 type State int
 
+// StateNew ...
 const (
 	StateNew State = iota
 	StateUpdated
@@ -16,6 +18,7 @@ const (
 	StateOld
 )
 
+//StateName ..
 var StateName = map[State]string{
 	StateNew:     "New",
 	StateUpdated: "Updated",
@@ -23,27 +26,32 @@ var StateName = map[State]string{
 	StateOld:     "Old",
 }
 
+//CustomApplication ...
 type CustomApplication struct {
 	State State
 	zabbix.Application
 }
 
+//CustomTrigger ...
 type CustomTrigger struct {
 	State State
 	zabbix.Trigger
 }
 
+//CustomHostGroup ...
 type CustomHostGroup struct {
 	State State
 	zabbix.HostGroup
 }
 
+//CustomItem ...
 type CustomItem struct {
 	State State
 	zabbix.Item
 	Applications map[string]struct{}
 }
 
+//CustomHost ...
 type CustomHost struct {
 	State State
 	zabbix.Host
@@ -53,11 +61,13 @@ type CustomHost struct {
 	Triggers     map[string]*CustomTrigger
 }
 
+//CustomZabbix ...
 type CustomZabbix struct {
 	Hosts      map[string]*CustomHost
 	HostGroups map[string]*CustomHostGroup
 }
 
+//AddHost ...
 func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 	updatedHost = host
 
@@ -81,6 +91,7 @@ func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 	return updatedHost
 }
 
+//AddItem ...
 func (host *CustomHost) AddItem(item *CustomItem) {
 
 	updatedItem := item
@@ -104,6 +115,7 @@ func (host *CustomHost) AddItem(item *CustomItem) {
 	host.Items[item.Key] = updatedItem
 }
 
+//AddTrigger ...
 func (host *CustomHost) AddTrigger(trigger *CustomTrigger) {
 
 	updatedTrigger := trigger
@@ -127,6 +139,7 @@ func (host *CustomHost) AddTrigger(trigger *CustomTrigger) {
 	host.Triggers[trigger.Expression] = updatedTrigger
 }
 
+//AddApplication ...
 func (host *CustomHost) AddApplication(application *CustomApplication) {
 	if _, ok := host.Applications[application.Name]; ok {
 		if application.State == StateOld {
@@ -136,6 +149,7 @@ func (host *CustomHost) AddApplication(application *CustomApplication) {
 	host.Applications[application.Name] = application
 }
 
+//AddHostGroup ...
 func (z *CustomZabbix) AddHostGroup(hostGroup *CustomHostGroup) {
 	if _, ok := z.HostGroups[hostGroup.Name]; ok {
 		if hostGroup.State == StateOld {
@@ -145,6 +159,7 @@ func (z *CustomZabbix) AddHostGroup(hostGroup *CustomHostGroup) {
 	z.HostGroups[hostGroup.Name] = hostGroup
 }
 
+//Equal ...
 func (i *CustomHost) Equal(j *CustomHost) bool {
 	if i.Name != j.Name {
 		return false
@@ -154,7 +169,7 @@ func (i *CustomHost) Equal(j *CustomHost) bool {
 		return false
 	}
 
-	for hostGroupName, _ := range i.HostGroups {
+	for hostGroupName := range i.HostGroups {
 		if _, ok := j.HostGroups[hostGroupName]; !ok {
 			return false
 		}
@@ -175,6 +190,7 @@ func (i *CustomHost) Equal(j *CustomHost) bool {
 	return true
 }
 
+//Equal ...
 func (i *CustomItem) Equal(j *CustomItem) bool {
 	if i.Name != j.Name {
 		return false
@@ -200,7 +216,7 @@ func (i *CustomItem) Equal(j *CustomItem) bool {
 		return false
 	}
 
-	for appName, _ := range i.Applications {
+	for appName := range i.Applications {
 		if _, ok := j.Applications[appName]; !ok {
 			return false
 		}
@@ -209,6 +225,7 @@ func (i *CustomItem) Equal(j *CustomItem) bool {
 	return true
 }
 
+//Equal ...
 func (i *CustomTrigger) Equal(j *CustomTrigger) bool {
 	if i.Expression != j.Expression {
 		return false
@@ -237,6 +254,7 @@ func (i *CustomTrigger) Equal(j *CustomTrigger) bool {
 	return true
 }
 
+//GetHostsByState ...
 func (z *CustomZabbix) GetHostsByState() (hostByState map[State]zabbix.Hosts) {
 
 	hostByState = map[State]zabbix.Hosts{
@@ -248,7 +266,7 @@ func (z *CustomZabbix) GetHostsByState() (hostByState map[State]zabbix.Hosts) {
 
 	newHostAmmount := 0
 	for _, host := range z.Hosts {
-		for hostGroupName, _ := range host.HostGroups {
+		for hostGroupName := range host.HostGroups {
 			host.GroupIds = append(host.GroupIds, zabbix.HostGroupId{GroupId: z.HostGroups[hostGroupName].GroupId})
 		}
 		hostByState[host.State] = append(hostByState[host.State], host.Host)
@@ -264,6 +282,7 @@ func (z *CustomZabbix) GetHostsByState() (hostByState map[State]zabbix.Hosts) {
 	return hostByState
 }
 
+//GetHostGroupsByState ...
 func (z *CustomZabbix) GetHostGroupsByState() (hostGroupsByState map[State]zabbix.HostGroups) {
 
 	hostGroupsByState = map[State]zabbix.HostGroups{
@@ -289,6 +308,7 @@ func (z *CustomZabbix) GetHostGroupsByState() (hostGroupsByState map[State]zabbi
 	return hostGroupsByState
 }
 
+//PropagateCreatedHosts ...
 func (zabbix *CustomZabbix) PropagateCreatedHosts(hosts zabbix.Hosts) {
 	for _, newHost := range hosts {
 		if host, ok := zabbix.Hosts[newHost.Name]; ok {
@@ -297,6 +317,7 @@ func (zabbix *CustomZabbix) PropagateCreatedHosts(hosts zabbix.Hosts) {
 	}
 }
 
+//PropagateCreatedHostGroups ...
 func (zabbix *CustomZabbix) PropagateCreatedHostGroups(hostGroups zabbix.HostGroups) {
 	for _, newHostGroup := range hostGroups {
 		if hostGroup, ok := zabbix.HostGroups[newHostGroup.Name]; ok {
@@ -305,6 +326,7 @@ func (zabbix *CustomZabbix) PropagateCreatedHostGroups(hostGroups zabbix.HostGro
 	}
 }
 
+//PropagateCreatedApplications ...
 func (host *CustomHost) PropagateCreatedApplications(applications zabbix.Applications) {
 
 	for _, application := range applications {
@@ -312,6 +334,7 @@ func (host *CustomHost) PropagateCreatedApplications(applications zabbix.Applica
 	}
 }
 
+//GetItemsByState ...
 func (host *CustomHost) GetItemsByState() (itemsByState map[State]zabbix.Items) {
 
 	itemsByState = map[State]zabbix.Items{
@@ -325,7 +348,7 @@ func (host *CustomHost) GetItemsByState() (itemsByState map[State]zabbix.Items) 
 	for _, item := range host.Items {
 		item.HostId = host.HostId
 		item.Item.ApplicationIds = []string{}
-		for appName, _ := range item.Applications {
+		for appName := range item.Applications {
 			item.Item.ApplicationIds = append(item.Item.ApplicationIds, host.Applications[appName].ApplicationId)
 		}
 		itemsByState[item.State] = append(itemsByState[item.State], item.Item)
@@ -341,6 +364,7 @@ func (host *CustomHost) GetItemsByState() (itemsByState map[State]zabbix.Items) 
 	return itemsByState
 }
 
+//GetTriggersByState ...
 func (host *CustomHost) GetTriggersByState() (triggersByState map[State]zabbix.Triggers) {
 
 	triggersByState = map[State]zabbix.Triggers{
@@ -365,6 +389,7 @@ func (host *CustomHost) GetTriggersByState() (triggersByState map[State]zabbix.T
 	return triggersByState
 }
 
+//GetApplicationsByState ...
 func (host *CustomHost) GetApplicationsByState() (applicationsByState map[State]zabbix.Applications) {
 
 	applicationsByState = map[State]zabbix.Applications{
@@ -389,6 +414,7 @@ func (host *CustomHost) GetApplicationsByState() (applicationsByState map[State]
 	return applicationsByState
 }
 
+//GetZabbixPriority ...
 func GetZabbixPriority(severity string) zabbix.PriorityType {
 
 	switch strings.ToLower(severity) {

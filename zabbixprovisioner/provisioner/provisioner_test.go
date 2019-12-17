@@ -3,7 +3,7 @@ package provisioner_test
 import (
 	"testing"
 
-	"github.com/devopyio/zabbix-alertmanager/zabbixprovisioner/provisioner"
+	"github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/provisioner"
 )
 
 const (

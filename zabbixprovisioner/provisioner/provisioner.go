@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	zabbix "github.com/devopyio/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
+	zabbix "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
@@ -91,6 +91,13 @@ func (p *Provisioner) Run() error {
 	if err := p.ApplyChanges(); err != nil {
 		return errors.Wrap(err, "error applying changes")
 	}
+
+	return nil
+}
+
+//LoadTargetsFromPrometheus ...
+func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
+	resp, err := http.Get(p.prometheusUrl)
 
 	return nil
 }
