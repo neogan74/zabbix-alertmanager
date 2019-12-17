@@ -1,3 +1,3 @@
-module github.com/neogan74/zabbixprovisioner/provisioner
+module github.com/zabbix-alertmanager/zabbixprovisioner/provisioner
 
 go 1.13
