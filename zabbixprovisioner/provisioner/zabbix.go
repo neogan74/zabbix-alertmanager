@@ -306,6 +306,34 @@ func (i *CustomTrigger) Equal(j *CustomTrigger) bool {
 	return true
 }
 
+//GetTemplatesByState ...
+func (z *CustomZabbix) GetTemplatesByState() (templateByState map[State]zabbix.Templates) {
+
+	templateByState = map[State]zabbix.Templates{
+		StateNew:     zabbix.Templates{},
+		StateOld:     zabbix.Templates{},
+		StateUpdated: zabbix.Templates{},
+		StateEqual:   zabbix.Templates{},
+	}
+
+	newTemplateAmmount := 0
+	for _, tmpl := range z.Templates {
+		for hostGroupName := range tmpl.HostGroups {
+			tmpl.GroupIds = append(tmpl.GroupIds, zabbix.HostGroupId{GroupId: z.HostGroups[hostGroupName].GroupId})
+		}
+		templateByState[tmpl.State] = append(templateByState[tmpl.State], tmpl.Template)
+		if StateName[tmpl.State] == "New" || StateName[tmpl.State] == "Updated" {
+			newTemplateAmmount++
+			log.Infof("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
+		} else {
+			log.Debugf("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
+		}
+	}
+
+	log.Infof("HOSTS, total: %v, new or updated: %v", len(z.Hosts), newTemplateAmmount)
+	return templateByState
+}
+
 //GetHostsByState ...
 func (z *CustomZabbix) GetHostsByState() (hostByState map[State]zabbix.Hosts) {
 
@@ -358,6 +386,15 @@ func (z *CustomZabbix) GetHostGroupsByState() (hostGroupsByState map[State]zabbi
 	log.Infof("HOSTGROUPS, total: %v, new or updated: %v", len(z.HostGroups), newHostGroupAmmount)
 
 	return hostGroupsByState
+}
+
+//PropagateCreatedHosts ...
+func (zabbix *CustomZabbix) PropagateCreatedTemplates(templates zabbix.Templates) {
+	for _, newTemplate := range templates {
+		if tmpl, ok := zabbix.Templates[newTemplate.Name]; ok {
+			tmpl.TemplateID = newTemplate.TemplateID
+		}
+	}
 }
 
 //PropagateCreatedHosts ...
