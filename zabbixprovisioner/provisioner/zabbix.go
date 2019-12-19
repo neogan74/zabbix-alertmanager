@@ -51,6 +51,16 @@ type CustomItem struct {
 	Applications map[string]struct{}
 }
 
+//CustomTemplate ..
+type CustomTemplate struct {
+	State State
+	zabbix.Template
+	HostGroups   map[string]struct{}
+	Applications map[string]*CustomApplication
+	Items        map[string]*CustomItem
+	Triggers     map[string]*CustomTrigger
+}
+
 //CustomHost ...
 type CustomHost struct {
 	State State
@@ -64,7 +74,30 @@ type CustomHost struct {
 //CustomZabbix ...
 type CustomZabbix struct {
 	Hosts      map[string]*CustomHost
+	Templates  map[string]*CustomTemplate
 	HostGroups map[string]*CustomHostGroup
+}
+
+//AddTemaplate ...
+func (z *CustomZabbix) AddTemplate(tmpl *CustomTemplate) (updatedTemplate *CustomTemplate) {
+	updatedTemplate = tmpl
+	if existing, ok := z.Templates[tmpl.Name]; ok {
+		if existing.Equal(tmpl) {
+			if tmpl.State == StateOld {
+				existing.TemplateID = tmpl.TemplateID
+				existing.State = StateEqual
+				updatedTemplate = existing
+			}
+		} else {
+			if tmpl.State == StateOld {
+				existing.TemplateID = tmpl.TemplateID
+			}
+			existing.State = StateUpdated
+			updatedTemplate = existing
+		}
+	}
+	z.Templates[tmpl.Name] = updatedTemplate
+	return updatedTemplate
 }
 
 //AddHost ...
@@ -157,6 +190,25 @@ func (z *CustomZabbix) AddHostGroup(hostGroup *CustomHostGroup) {
 		}
 	}
 	z.HostGroups[hostGroup.Name] = hostGroup
+}
+
+//Equal ...
+func (i *CustomTemplate) Equal(j *CustomTemplate) bool {
+	if i.Name != j.Name {
+		return false
+	}
+
+	if len(i.HostGroups) != len(j.HostGroups) {
+		return false
+	}
+
+	for hostGroupName := range i.HostGroups {
+		if _, ok := j.HostGroups[hostGroupName]; !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 //Equal ...
