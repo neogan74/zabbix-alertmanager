@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	zabbix "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
 	"github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/provisioner"
+	zabbix "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
 	"github.com/neogan74/zabbix-alertmanager/zabbixsender/zabbixsnd"
 	"github.com/neogan74/zabbix-alertmanager/zabbixsender/zabbixsvc"
 	"github.com/povilasv/prommod"
@@ -191,6 +191,7 @@ func main() {
 		}
 		// log.Infof("Targets: %v\n", data)
 		var targets []string
+		var targTags = make(map[string][]string)
 		var targetsjs TargetsList
 		err = json.Unmarshal(data, &targetsjs)
 		if err != nil {
@@ -198,10 +199,13 @@ func main() {
 		}
 		log.Infof("Targets: %v\n", targetsjs)
 		for _, v := range targetsjs.Data.ActiveTargets {
-			targets = append(targets, v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")])
+			targname := v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")]
+			log.Info(targname, v.Labels.Job, v.Labels.Group)
+			targets = append(targets, targname)
+			targTags[targname] = []string{"Prometheus", v.Labels.Job, v.Labels.Group}
 			// log.Infof("%v\n", v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")])
 		}
-		log.Infof("targets list: %v", targets)
+		log.Infof("targets list: %v", targets, targTags)
 		//Create hosts in zabbix
 		// vars
 		url := "http://51.15.213.9:8144/api_jsonrpc.php"
@@ -219,17 +223,63 @@ func main() {
 
 		var newHosts []zabbix.Host
 		// var hosts []interface{}
+
+		hgid, err := api.HostGroupsGet(zabbix.Params{
+			"output": "extend",
+			"filter": map[string]string{
+				"name": "Prometheus",
+			},
+		})
+		//create hostgroup
+		// err = api.HostGroupsCreate([]zabbix.HostGroup{zabbix.HostGroup{Name: "Prometheus"}})
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("hostgropup %v\n", hgid[0].GroupId)
+		//get hosts by hostgroupID
+		hstlist, err := api.HostsGetByHostGroupIds([]string{hgid[0].GroupId})
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("hosts for group: %v\n", hstlist)
 		for _, trg := range targets {
-			q, err := api.HostGetByHost(trg)
-			if err != nil {
-				log.Infof("Error to get hosts %s from Zabbix API: %s", err, trg)
-				// createHost here
-				nh := &zabbix.Host{Host: trg}
-				newHosts = append(newHosts, *nh)
+			NotNeed := 0
+			for _, check := range hstlist {
+				log.Infof("Two: %v %v", check.Host, trg)
+				if check.Host == trg {
+					NotNeed = 1
+				}
 			}
-
-			log.Infof("%v\n%v\n", q, newHosts)
-
+			if NotNeed != 1 {
+				newHosts = append(newHosts, zabbix.Host{
+					Host:          trg,
+					Available:     1,
+					Name:          trg,
+					Status:        0,
+					InventoryMode: zabbix.InventoryManual,
+					Inventory: map[string]string{
+						"deployment_status": "run",
+						"tag":               "test",
+					},
+					Interfaces: zabbix.HostInterfaces{
+						zabbix.HostInterface{
+							DNS:   "",
+							IP:    "127.0.0.1",
+							Main:  1,
+							Port:  "10050",
+							Type:  1,
+							UseIP: 1,
+						},
+					},
+					GroupIds: zabbix.HostGroupIds{zabbix.HostGroupId{hgid[0].GroupId}},
+				})
+			}
+		}
+		if len(newHosts) != 0 {
+			err = api.HostsCreate(newHosts)
+			if err != nil {
+				log.Fatalf("Error while creating hosts: %v", err)
+			}
 		}
 
 	}

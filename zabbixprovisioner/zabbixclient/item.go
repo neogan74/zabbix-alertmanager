@@ -3,7 +3,7 @@ package zabbixclient
 import (
 	"fmt"
 
-	reflector "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbxutil"
+	reflector "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixutil"
 )
 
 type (

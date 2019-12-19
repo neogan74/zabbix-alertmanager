@@ -1,11 +1,14 @@
 package provisioner
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+	"time"
 
 	zabbix "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixclient"
 	"github.com/pkg/errors"
@@ -24,6 +27,31 @@ type HostConfig struct {
 	ItemDefaultTrapperHosts string            `yaml:"itemDefaultTrapperHosts"`
 	HostAlertsDir           string            `yaml:"alertsDir"`
 	TriggerTags             map[string]string `yaml:"triggerTags"`
+}
+
+type TargetsList struct {
+	Status string `json:"status"`
+	Data   struct {
+		ActiveTargets []struct {
+			DiscoveredLabels struct {
+				Address     string `json:"__address__"`
+				MetricsPath string `json:"__metrics_path__"`
+				Scheme      string `json:"__scheme__"`
+				Group       string `json:"group"`
+				Job         string `json:"job"`
+			} `json:"discoveredLabels"`
+			Labels struct {
+				Group    string `json:"group"`
+				Instance string `json:"instance"`
+				Job      string `json:"job"`
+			} `json:"labels"`
+			ScrapeURL  string    `json:"scrapeUrl"`
+			LastError  string    `json:"lastError"`
+			LastScrape time.Time `json:"lastScrape"`
+			Health     string    `json:"health"`
+		} `json:"activeTargets"`
+		DroppedTargets []interface{} `json:"droppedTargets"`
+	} `json:"data"`
 }
 
 type Provisioner struct {
@@ -97,8 +125,62 @@ func (p *Provisioner) Run() error {
 
 //LoadTargetsFromPrometheus ...
 func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
-	resp, err := http.Get(p.prometheusUrl)
+	resp, err := http.Get("http://51.15.213.9:9090/api/v1/targets")
+	if err != nil {
+		log.Infof("Error while get targets: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
 
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Error with body: %v\n", err)
+	}
+	var targets []string
+	var targetsjs TargetsList
+	err = json.Unmarshal(data, &targetsjs)
+	if err != nil {
+		log.Fatalf("Error while JSON unmarshal %s", err)
+	}
+	for _, v := range targetsjs.Data.ActiveTargets {
+		targets = append(targets, v.Labels.Instance[:strings.LastIndex(v.Labels.Instance, ":")])
+	}
+	log.Infof("targets list: %v", targets)
+	for _, trg := range targets {
+		newHost := &CustomHost{
+			State: StateNew,
+			Host: zabbix.Host{
+				Host:          trg,
+				Available:     1,
+				Name:          trg,
+				Status:        0,
+				InventoryMode: zabbix.InventoryManual,
+				Inventory: map[string]string{
+					"tag": "Prom2zbx",
+				},
+				Interfaces: zabbix.HostInterfaces{
+					zabbix.HostInterface{
+						DNS:   "",
+						IP:    "127.0.0.1",
+						Main:  1,
+						Port:  "10050",
+						Type:  1,
+						UseIP: 1,
+					},
+				},
+			},
+			HostGroups: make(map[string]struct{}, 1),
+		}
+		hostGroupName := "Prom2zabbix"
+		p.AddHostGroup(&CustomHostGroup{
+			State: StateNew,
+			HostGroup: zabbix.HostGroup{
+				Name: hostGroupName,
+			}})
+		newHost.HostGroups[hostGroupName] = struct{}{}
+		log.Debugf("Host from Prometheus: %+v", newHost)
+		p.AddHost(newHost)
+	}
 	return nil
 }
 
