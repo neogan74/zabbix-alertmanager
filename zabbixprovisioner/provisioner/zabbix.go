@@ -82,6 +82,7 @@ type CustomZabbix struct {
 func (z *CustomZabbix) AddTemplate(tmpl *CustomTemplate) (updatedTemplate *CustomTemplate) {
 	updatedTemplate = tmpl
 	if existing, ok := z.Templates[tmpl.Name]; ok {
+		log.Debugf("===In ADDTEMPALTE ===: %+v", existing, tmpl)
 		if existing.Equal(tmpl) {
 			if tmpl.State == StateOld {
 				existing.TemplateID = tmpl.TemplateID
@@ -189,20 +190,110 @@ func (z *CustomZabbix) GetTemplatesByState() (templateByState map[State]zabbix.T
 
 	newTemplateAmmount := 0
 	for _, tmpl := range z.Templates {
+		log.Debugf("ZTMPL: %+v", tmpl)
 		for hostGroupName := range tmpl.HostGroups {
 			tmpl.GroupIds = append(tmpl.GroupIds, zabbix.HostGroupID{GroupID: z.HostGroups[hostGroupName].GroupID})
 		}
 		templateByState[tmpl.State] = append(templateByState[tmpl.State], tmpl.Template)
 		if StateName[tmpl.State] == "New" || StateName[tmpl.State] == "Updated" {
 			newTemplateAmmount++
-			log.Infof("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
+			log.Infof("GetTemplatesByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
 		} else {
-			log.Debugf("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
+			log.Debugf("GetTemplatesByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
 		}
 	}
 
-	log.Infof("HOSTS, total: %v, new or updated: %v", len(z.Hosts), newTemplateAmmount)
+	log.Infof("TEMPLATES, total: %v, new or updated: %v", len(z.Templates), newTemplateAmmount)
 	return templateByState
+}
+
+//GetApplicationsByState ...
+func (tmpl *CustomTemplate) GetApplicationsByState() (applicationsByState map[State]zabbix.Applications) {
+
+	applicationsByState = map[State]zabbix.Applications{
+		StateNew:     zabbix.Applications{},
+		StateOld:     zabbix.Applications{},
+		StateUpdated: zabbix.Applications{},
+		StateEqual:   zabbix.Applications{},
+	}
+	newAppAmmount := 0
+	log.Debugf("Application template obj: %+v", tmpl)
+	for _, application := range tmpl.Applications {
+		application.Application.TemplateID = tmpl.TemplateID
+		applicationsByState[application.State] = append(applicationsByState[application.State], application.Application)
+		if StateName[application.State] == "New" || StateName[application.State] == "Updated" {
+			newAppAmmount++
+			log.Infof("GetApplicationsByState = State: %s, Name: %s", StateName[application.State], application.Name)
+		} else {
+			log.Debugf("GetApplicationsByState = State: %s, Name: %s", StateName[application.State], application.Name)
+		}
+	}
+
+	log.Infof("APPLICATIONS, total: %v, new or updated: %v", len(tmpl.Applications), newAppAmmount)
+	return applicationsByState
+}
+
+//PropagateCreatedApplications ...
+func (tmpl *CustomTemplate) PropagateCreatedApplications(applications zabbix.Applications) {
+
+	for _, application := range applications {
+		tmpl.Applications[application.Name].ApplicationID = application.ApplicationID
+	}
+}
+
+//GetItemsByState ...
+func (tmpl *CustomTemplate) GetItemsByState() (itemsByState map[State]zabbix.Items) {
+
+	itemsByState = map[State]zabbix.Items{
+		StateNew:     zabbix.Items{},
+		StateOld:     zabbix.Items{},
+		StateUpdated: zabbix.Items{},
+		StateEqual:   zabbix.Items{},
+	}
+
+	newItemAmmount := 0
+	for _, item := range tmpl.Items {
+		item.HostID = tmpl.TemplateID
+		item.Item.ApplicationIds = []string{}
+		for appName := range item.Applications {
+			item.Item.ApplicationIds = append(item.Item.ApplicationIds, tmpl.Applications[appName].ApplicationID)
+		}
+		itemsByState[item.State] = append(itemsByState[item.State], item.Item)
+		if StateName[item.State] == "New" || StateName[item.State] == "Updated" {
+			newItemAmmount++
+			log.Infof("GetItemsByState = State: %s, Key: %s, Applications: %+v", StateName[item.State], item.Key, item.Applications)
+		} else {
+			log.Debugf("GetItemsByState = State: %s, Key: %s, Applications: %+v", StateName[item.State], item.Key, item.Applications)
+		}
+	}
+
+	log.Infof("ITEMS, total: %v, new or updated: %v", len(tmpl.Items), newItemAmmount)
+	return itemsByState
+}
+
+//GetTriggersByState ...
+func (tmpl *CustomTemplate) GetTriggersByState() (triggersByState map[State]zabbix.Triggers) {
+
+	triggersByState = map[State]zabbix.Triggers{
+		StateNew:     zabbix.Triggers{},
+		StateOld:     zabbix.Triggers{},
+		StateUpdated: zabbix.Triggers{},
+		StateEqual:   zabbix.Triggers{},
+	}
+
+	newTriggerAmmount := 0
+	for _, trigger := range tmpl.Triggers {
+		triggersByState[trigger.State] = append(triggersByState[trigger.State], trigger.Trigger)
+		if StateName[trigger.State] == "New" || StateName[trigger.State] == "Updated" {
+			newTriggerAmmount++
+			log.Infof("GetTriggersByState = State: %s, Expression: %s", StateName[trigger.State], trigger.Expression)
+		} else {
+			log.Debugf("GetTriggersByState = State: %s, Expression: %s", StateName[trigger.State], trigger.Expression)
+		}
+	}
+
+	log.Infof("TRIGGERS, total: %v, new or updated: %v", len(tmpl.Triggers), newTriggerAmmount)
+	return triggersByState
 }
 
 //AddHost ...

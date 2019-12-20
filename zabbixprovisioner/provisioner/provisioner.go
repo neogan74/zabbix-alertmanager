@@ -20,6 +20,7 @@ import (
 type HostConfig struct {
 	Name                    string            `yaml:"name"`
 	HostGroups              []string          `yaml:"hostGroups"`
+	TemplateHostGroups      []string          `yaml:"templateHostGroups"`
 	Tag                     string            `yaml:"tag"`
 	DeploymentStatus        string            `yaml:"deploymentStatus"`
 	ItemDefaultApplication  string            `yaml:"itemDefaultApplication"`
@@ -143,6 +144,9 @@ func (p *Provisioner) Run() error {
 
 //LoadTargetsFromPrometheus ...
 func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
+	log.Debugln("===================================================================")
+	log.Debugln("=======================LoadTargetsFromPrometheus=====================")
+	log.Debugln("===================================================================")
 	targetsPath := "/api/v1/targets"
 	promURL := fmt.Sprintf("%s%s", p.prometheusURL, targetsPath)
 	resp, err := http.Get(promURL)
@@ -191,14 +195,16 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 			},
 			HostGroups: make(map[string]struct{}, 1),
 		}
-		hostGroupName := hostConfig.HostGroups[0]
-		p.AddHostGroup(&CustomHostGroup{
-			State: StateNew,
-			HostGroup: zabbix.HostGroup{
-				Name: hostGroupName,
-			}})
-		newHost.HostGroups[hostGroupName] = struct{}{}
-		log.Debugf("Host from Prometheus: %+v", newHost)
+
+		for _, hostGroupName := range hostConfig.HostGroups {
+			p.AddHostGroup(&CustomHostGroup{
+				State: StateNew,
+				HostGroup: zabbix.HostGroup{
+					Name: hostGroupName,
+				}})
+			newHost.HostGroups[hostGroupName] = struct{}{}
+			log.Debugf("Host from Prometheus: %+v", newHost)
+		}
 		p.AddHost(newHost)
 	}
 	return nil
@@ -206,6 +212,9 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 
 //LoadRulesFromPrometheus function Creates hosts structures and populate them from Prometheus rules
 func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
+	log.Debugln("===================================================================")
+	log.Debugln("=======================LoadRulesFromPrometheus=====================")
+	log.Debugln("===================================================================")
 	rules, err := LoadPrometheusRulesFromDir(hostConfig.HostAlertsDir)
 	if err != nil {
 		return errors.Wrap(err, "error loading rules")
@@ -224,19 +233,20 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 		Applications: map[string]*CustomApplication{},
 		Triggers:     map[string]*CustomTrigger{},
 	}
-	for _, hostGroupName := range hostConfig.HostGroups {
+	for _, templateGroupName := range hostConfig.TemplateHostGroups {
 		p.AddHostGroup(&CustomHostGroup{
 			State: StateNew,
 			HostGroup: zabbix.HostGroup{
-				Name: hostGroupName,
+				Name: templateGroupName,
 			},
 		})
 
-		newTemplate.HostGroups[hostGroupName] = struct{}{}
+		newTemplate.HostGroups[templateGroupName] = struct{}{}
 	}
 
 	// Parse Prometheus rules and create corresponding items/triggers and applications for this host
 	for _, rule := range rules {
+		log.Debugf("Prom rule: %+v", rule)
 		key := fmt.Sprintf("%s.%s", strings.ToLower(p.keyPrefix), strings.ToLower(rule.Name))
 
 		var triggerTags []zabbix.Tag
@@ -314,7 +324,7 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 		newTemplate.AddTrigger(newTrigger)
 
 	}
-	log.Debugf("Host from Prometheus: %+v", newTemplate)
+	log.Debugf("Template for Prometheus: %+v", newTemplate)
 	p.AddTemplate(newTemplate)
 
 	return nil
@@ -322,12 +332,16 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 
 //LoadDataFromZabbix Update created hosts with the current state in Zabbix
 func (p *Provisioner) LoadDataFromZabbix() error {
+	log.Debugln("===================================================================")
+	log.Debugln("=======================LoadDataFromZabbix==========================")
+	log.Debugln("===================================================================")
 	hostNames := make([]string, len(p.hosts))
 	templateNames := []string{}
 	hostGroupNames := []string{}
 	for i := range p.hosts {
 		hostNames[i] = p.hosts[i].Name
 		templateNames = append(templateNames, p.hosts[i].Name)
+		hostGroupNames = append(hostGroupNames, p.hosts[i].TemplateHostGroups...)
 		hostGroupNames = append(hostGroupNames, p.hosts[i].HostGroups...)
 	}
 
@@ -351,6 +365,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 			HostGroup: zabbixHostGroup,
 		})
 	}
+	log.Debugf("Zabbix HGs: %+v", zabbixHostGroups)
 
 	// Getting ZABBIX TEMPLATES //
 
@@ -363,11 +378,13 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 			"host": templateNames,
 		},
 	})
+	log.Debugf("ZABBIX TEmpaltes: %+v\n", zabbixTemplates)
 
 	for _, zabbixTemplate := range zabbixTemplates {
 		zabbixHostGroups, err := p.api.HostGroupsGet(zabbix.Params{
-			"output":      "extend",
-			"templateids": zabbixTemplate.TemplateID,
+			"output":       "extend",
+			"selectGroups": "",
+			"templateids":  zabbixTemplate.TemplateID,
 		})
 		if err != nil {
 			return errors.Wrapf(err, "error getting hostgroup, hostid: %v", zabbixTemplate.TemplateID)
@@ -460,7 +477,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 	zabbixHosts, err := p.api.HostsGet(zabbix.Params{
 		"output":   "extend",
-		"groupids": hgids[1],
+		"groupids": "23",
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error getting hosts: %v", hostNames)
@@ -479,8 +496,9 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 		hostGroups := make(map[string]struct{}, len(zabbixHostGroups))
 		for _, zabbixHostGroup := range zabbixHostGroups {
 			hostGroups[zabbixHostGroup.Name] = struct{}{}
+			log.Debugf("PHHHGGG: %+v\n", p.HostGroups["Prometheus"].State)
 		}
-
+		log.Debugf("HHHGGG: %+v\n\n\n", hostGroups)
 		// Remove hostid because the Zabbix api add it automatically and it breaks the comparison between new/old hosts
 		delete(zabbixHost.Inventory, "hostid")
 
@@ -499,6 +517,9 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 //ApplyChanges ...
 func (p *Provisioner) ApplyChanges() error {
+	log.Debugln("===================================================================")
+	log.Debugln("=======================ApplyChanges================================")
+	log.Debugln("===================================================================")
 	hostGroupsByState := p.GetHostGroupsByState()
 	if len(hostGroupsByState[StateNew]) != 0 {
 		log.Debugf("Creating HostGroups: %+v\n", hostGroupsByState[StateNew])
@@ -515,10 +536,93 @@ func (p *Provisioner) ApplyChanges() error {
 	if len(templatesByState[StateNew]) != 0 {
 		log.Debug("Creating Templates: %+v\n", templatesByState[StateNew])
 		err := p.api.TemplateCreate(templatesByState[StateNew])
+		log.Debugf("===TEMPLATES: %+v", templatesByState)
+
 		if err != nil {
 			return errors.Wrap(err, "Failed in creating tempalte")
 		}
 	}
+	if len(templatesByState[StateUpdated]) != 0 {
+		log.Debugf("Updating Templates: %+v\n", templatesByState[StateUpdated])
+		err := p.api.TemplatesUpdate(templatesByState[StateUpdated])
+		if err != nil {
+			return errors.Wrap(err, "Failed in updating host")
+		}
+	}
+
+	for _, template := range p.Templates {
+		log.Debugf("Updating host, hostName: %s", template.Name)
+
+		applicationsByState := template.GetApplicationsByState()
+		if len(applicationsByState[StateOld]) != 0 {
+			log.Debugf("Deleting applications: %+v\n", applicationsByState[StateOld])
+			err := p.api.ApplicationsDelete(applicationsByState[StateOld])
+			if err != nil {
+				return errors.Wrap(err, "Failed in deleting applications")
+			}
+		}
+
+		if len(applicationsByState[StateNew]) != 0 {
+			log.Debugf("Creating applications: %+v\n", applicationsByState[StateNew])
+			err := p.api.ApplicationsCreate(applicationsByState[StateNew])
+			if err != nil {
+				return errors.Wrap(err, "Failed in creating applications")
+			}
+		}
+		template.PropagateCreatedApplications(applicationsByState[StateNew])
+
+		itemsByState := template.GetItemsByState()
+		triggersByState := template.GetTriggersByState()
+
+		if len(triggersByState[StateOld]) != 0 {
+			log.Debugf("Deleting triggers: %+v\n", triggersByState[StateOld])
+			err := p.api.TriggersDelete(triggersByState[StateOld])
+			if err != nil {
+				return errors.Wrap(err, "Failed in deleting triggers")
+			}
+		}
+
+		if len(itemsByState[StateOld]) != 0 {
+			log.Debugf("Deleting items: %+v\n", itemsByState[StateOld])
+			err := p.api.ItemsDelete(itemsByState[StateOld])
+			if err != nil {
+				return errors.Wrap(err, "Failed in deleting items")
+			}
+		}
+
+		if len(itemsByState[StateUpdated]) != 0 {
+			log.Debugf("Updating items: %+v\n", itemsByState[StateUpdated])
+			err := p.api.ItemsUpdate(itemsByState[StateUpdated])
+			if err != nil {
+				return errors.Wrap(err, "Failed in updating items")
+			}
+		}
+
+		if len(triggersByState[StateUpdated]) != 0 {
+			log.Debugf("Updating triggers: %+v\n", triggersByState[StateUpdated])
+			err := p.api.TriggersUpdate(triggersByState[StateUpdated])
+			if err != nil {
+				return errors.Wrap(err, "Failed in updating triggers")
+			}
+		}
+
+		if len(itemsByState[StateNew]) != 0 {
+			log.Debugf("Creating items: %+v\n", itemsByState[StateNew])
+			err := p.api.ItemsCreate(itemsByState[StateNew])
+			if err != nil {
+				return errors.Wrap(err, "Failed in creating items")
+			}
+		}
+
+		if len(triggersByState[StateNew]) != 0 {
+			log.Debugf("Creating triggers: %+v\n", triggersByState[StateNew])
+			err := p.api.TriggersCreate(triggersByState[StateNew])
+			if err != nil {
+				return errors.Wrap(err, "Failed in creating triggers")
+			}
+		}
+	}
+
 	hostsByState := p.GetHostsByState()
 	if len(hostsByState[StateNew]) != 0 {
 		log.Debugf("Creating Hosts: %+v\n", hostsByState[StateNew])
