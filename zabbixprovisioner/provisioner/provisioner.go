@@ -61,7 +61,7 @@ type Provisioner struct {
 	api           *zabbix.API
 	keyPrefix     string
 	hosts         []HostConfig
-	prometheusUrl string
+	prometheusURL string
 	*CustomZabbix
 }
 
@@ -73,7 +73,7 @@ gets parameters:
   user,password -  Zabbix API credentails
   hosts - list of hosts which will be created, updated in zabbix
 */
-func New(prometheusUrl, keyPrefix, url, user, password string, hosts []HostConfig) (*Provisioner, error) {
+func New(prometheusURL, keyPrefix, url, user, password string, hosts []HostConfig) (*Provisioner, error) {
 	transport := http.DefaultTransport
 	//Zabbix API init
 	api := zabbix.NewAPI(url)
@@ -89,7 +89,7 @@ func New(prometheusUrl, keyPrefix, url, user, password string, hosts []HostConfi
 		api:           api,
 		keyPrefix:     keyPrefix,
 		hosts:         hosts,
-		prometheusUrl: prometheusUrl,
+		prometheusURL: prometheusURL,
 	}, nil
 }
 
@@ -197,7 +197,7 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 	return nil
 }
 
-// Create hosts structures and populate them from Prometheus rules
+//LoadRulesFromPrometheus function Creates hosts structures and populate them from Prometheus rules
 func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 	rules, err := LoadPrometheusRulesFromDir(hostConfig.HostAlertsDir)
 	if err != nil {
@@ -262,10 +262,10 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 			},
 		}
 
-		if p.prometheusUrl != "" {
-			newTrigger.URL = p.prometheusUrl + "/alerts"
+		if p.prometheusURL != "" {
+			newTrigger.URL = p.prometheusURL + "/alerts"
 
-			url := p.prometheusUrl + "/graph?g0.expr=" + url.QueryEscape(rule.Expression)
+			url := p.prometheusURL + "/graph?g0.expr=" + url.QueryEscape(rule.Expression)
 			if len(url) < 255 {
 				newTrigger.URL = url
 			}
@@ -313,11 +313,11 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 	return nil
 }
 
-// Update created hosts with the current state in Zabbix
+//LoadDataFromZabbix Update created hosts with the current state in Zabbix
 func (p *Provisioner) LoadDataFromZabbix() error {
 	hostNames := make([]string, len(p.hosts))
 	hostGroupNames := []string{}
-	for i, _ := range p.hosts {
+	for i := range p.hosts {
 		hostNames[i] = p.hosts[i].Name
 		hostGroupNames = append(hostGroupNames, p.hosts[i].HostGroups...)
 	}
@@ -452,6 +452,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 	return nil
 }
 
+//ApplyChanges ...
 func (p *Provisioner) ApplyChanges() error {
 	hostGroupsByState := p.GetHostGroupsByState()
 	if len(hostGroupsByState[StateNew]) != 0 {
