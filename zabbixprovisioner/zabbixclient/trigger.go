@@ -4,10 +4,10 @@ import (
 	reflector "github.com/devopyio/zabbix-alertmanager/zabbixprovisioner/zabbixutil"
 )
 
-type (
-	PriorityType int
-)
+//PriorityType ...
+type PriorityType int
 
+//NotClassified ...
 const (
 	NotClassified PriorityType = 0
 	Information   PriorityType = 1
@@ -23,9 +23,9 @@ const (
 	Problem ValueType = 1
 )
 
-// https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/definitions
+//Trigger https://www.zabbix.com/documentation/4.4/manual/appendix/api/item/definitions
 type Trigger struct {
-	TriggerId   string       `json:"triggerid,omitempty"`
+	TriggerID   string       `json:"triggerid,omitempty"`
 	Description string       `json:"description"`
 	Expression  string       `json:"expression"`
 	Comments    string       `json:"comments"`
@@ -37,13 +37,16 @@ type Trigger struct {
 	Tags        []Tag        `json:"tags"`
 }
 
+//Tag ...
 type Tag struct {
 	Tag   string `json:"tag"`
 	Value string `json:"value"`
 }
+
+//Triggers ...
 type Triggers []Trigger
 
-// Wrapper for item.get https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/get
+//TriggersGet Wrapper for item.get https://www.zabbix.com/documentation/4.4/manual/appendix/api/item/get
 func (api *API) TriggersGet(params Params) (Triggers, error) {
 	var res Triggers
 	if _, present := params["output"]; !present {
@@ -58,7 +61,7 @@ func (api *API) TriggersGet(params Params) (Triggers, error) {
 	return res, nil
 }
 
-// Wrapper for item.create: https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/create
+//TriggersCreate Wrapper for item.create: https://www.zabbix.com/documentation/4.4/manual/appendix/api/item/create
 func (api *API) TriggersCreate(triggers Triggers) error {
 	response, err := api.CallWithError("trigger.create", triggers)
 	if err != nil {
@@ -68,12 +71,12 @@ func (api *API) TriggersCreate(triggers Triggers) error {
 	result := response.Result.(map[string]interface{})
 	triggerids := result["triggerids"].([]interface{})
 	for i, id := range triggerids {
-		triggers[i].TriggerId = id.(string)
+		triggers[i].TriggerID = id.(string)
 	}
 	return nil
 }
 
-// Wrapper for item.update: https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/update
+//TriggersUpdate Wrapper for item.update: https://www.zabbix.com/documentation/4.4/manual/appendix/api/item/update
 func (api *API) TriggersUpdate(triggers Triggers) error {
 	_, err := api.CallWithError("trigger.update", triggers)
 	if err != nil {
@@ -82,28 +85,28 @@ func (api *API) TriggersUpdate(triggers Triggers) error {
 	return nil
 }
 
-// Wrapper for item.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/delete
+//TriggersDelete Wrapper for item.delete: https://www.zabbix.com/documentation/4.4/manual/appendix/api/item/delete
 // Cleans ItemId in all items elements if call succeed.
 func (api *API) TriggersDelete(triggers Triggers) error {
 	ids := make([]string, len(triggers))
 	for i, trigger := range triggers {
-		ids[i] = trigger.TriggerId
+		ids[i] = trigger.TriggerID
 	}
 
-	err := api.TriggersDeleteByIds(ids)
+	err := api.TriggersDeleteByIDs(ids)
 	if err != nil {
 		return err
 	}
 
 	for i := range triggers {
-		triggers[i].TriggerId = ""
+		triggers[i].TriggerID = ""
 	}
 
 	return nil
 }
 
-// Wrapper for item.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/delete
-func (api *API) TriggersDeleteByIds(ids []string) error {
+//TriggersDeleteByIDs Wrapper for item.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/item/delete
+func (api *API) TriggersDeleteByIDs(ids []string) error {
 	response, err := api.CallWithError("trigger.delete", ids)
 	if err != nil {
 		return err

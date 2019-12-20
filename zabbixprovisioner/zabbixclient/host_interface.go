@@ -1,9 +1,9 @@
 package zabbixclient
 
-type (
-	InterfaceType int
-)
+//InterfaceType ...
+type InterfaceType int
 
+//Agent ...
 const (
 	Agent InterfaceType = 1
 	SNMP  InterfaceType = 2
@@ -11,7 +11,7 @@ const (
 	JMX   InterfaceType = 4
 )
 
-// https://www.zabbix.com/documentation/2.2/manual/appendix/api/hostinterface/definitions
+//HostInterface https://www.zabbix.com/documentation/4.4/manual/appendix/api/hostinterface/definitions
 type HostInterface struct {
 	DNS   string        `json:"dns"`
 	IP    string        `json:"ip"`
@@ -21,4 +21,5 @@ type HostInterface struct {
 	UseIP int           `json:"useip"`
 }
 
+//HostInterfaces ...
 type HostInterfaces []HostInterface

@@ -10,7 +10,7 @@ type Template struct {
 	DisplayName string `json:"name,omitempty"`
 
 	//Used only for creation.
-	GroupIds HostGroupIds `json:"groups,omitempty"`
+	GroupIds HostGroupIDs `json:"groups,omitempty"`
 }
 
 // Templates ..
@@ -22,7 +22,7 @@ func (api *API) TemplateGet(params Params) (Templates, error) {
 	if _, exist := params["output"]; !exist {
 		params["output"] = "extend"
 	}
-	resp, err := api.CallWithError("host.get", params)
+	resp, err := api.CallWithError("template.get", params)
 	if err != nil {
 		return nil, err
 	}
@@ -30,8 +30,9 @@ func (api *API) TemplateGet(params Params) (Templates, error) {
 	reflector.MapsToStructs2(resp.Result.([]interface{}), &res, reflector.Strconv, "json")
 	return res, nil
 }
+
 //TemplateCreate ..
-func (api *API) TemplateCreate(tmpls Templates) error  {
+func (api *API) TemplateCreate(tmpls Templates) error {
 	// resp, err := api.CallWithError("template.create",tmpls)
 
 	// if err != nil {

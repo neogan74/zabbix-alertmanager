@@ -6,12 +6,16 @@ import (
 	reflector "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixutil"
 )
 
-type (
-	AvailableType int
-	StatusType    int
-	InventoryType int
-)
+//AvailableType ...
+type AvailableType int
 
+//StatusType ...
+type StatusType int
+
+//InventoryType ...
+type InventoryType int
+
+//Available ...
 const (
 	Available   AvailableType = 1
 	Unavailable AvailableType = 2
@@ -24,9 +28,9 @@ const (
 	InventoryAutomatic InventoryType = 1
 )
 
-// https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/definitions
+//Host https://www.zabbix.com/documentation/4.4/manual/appendix/api/host/definitions
 type Host struct {
-	HostId    string        `json:"hostid,omitempty"`
+	HostID    string        `json:"hostid,omitempty"`
 	Host      string        `json:"host"`
 	Available AvailableType `json:"available"`
 	Error     string        `json:"error"`
@@ -37,13 +41,14 @@ type Host struct {
 	Inventory     map[string]string `json:"inventory"`
 
 	// Fields below used only when creating hosts
-	GroupIds   HostGroupIds   `json:"groups,omitempty"`
+	GroupIds   HostGroupIDs   `json:"groups,omitempty"`
 	Interfaces HostInterfaces `json:"interfaces,omitempty"`
 }
 
+//Hosts ...
 type Hosts []Host
 
-// Wrapper for host.get: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/get
+//HostsGet Wrapper for host.get: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/get
 func (api *API) HostsGet(params Params) (Hosts, error) {
 	var res Hosts
 	if _, present := params["output"]; !present {
@@ -58,7 +63,7 @@ func (api *API) HostsGet(params Params) (Hosts, error) {
 
 	if _, ok := params["selectInventory"]; ok {
 		results := response.Result.([]interface{})
-		for i, _ := range results {
+		for i := range results {
 			host := results[i].(map[string]interface{})
 			if reflect.TypeOf(host["inventory"]).Kind() == reflect.Map {
 				inventory := host["inventory"].(map[string]interface{})
@@ -72,22 +77,22 @@ func (api *API) HostsGet(params Params) (Hosts, error) {
 	return res, nil
 }
 
-// Gets hosts by host group Ids.
-func (api *API) HostsGetByHostGroupIds(ids []string) (res Hosts, err error) {
-	return api.HostsGet(Params{"groupids": ids})
+//HostsGetByHostGroupIDs Gets hosts by host group Ids.
+func (api *API) HostsGetByHostGroupIDs(IDs []string) (res Hosts, err error) {
+	return api.HostsGet(Params{"groupids": IDs})
 }
 
-// Gets hosts by host groups.
+//HostsGetByHostGroups Gets hosts by host groups.
 func (api *API) HostsGetByHostGroups(hostGroups HostGroups) (res Hosts, err error) {
-	ids := make([]string, len(hostGroups))
+	IDs := make([]string, len(hostGroups))
 	for i, id := range hostGroups {
-		ids[i] = id.GroupId
+		IDs[i] = id.GroupID
 	}
-	return api.HostsGetByHostGroupIds(ids)
+	return api.HostsGetByHostGroupIDs(IDs)
 }
 
-// Gets host by Id only if there is exactly 1 matching host.
-func (api *API) HostGetById(id string) (*Host, error) {
+//HostGetByID Gets host by Id only if there is exactly 1 matching host.
+func (api *API) HostGetByID(id string) (*Host, error) {
 	var res *Host
 	hosts, err := api.HostsGet(Params{"hostids": id})
 	if err != nil {
@@ -104,7 +109,7 @@ func (api *API) HostGetById(id string) (*Host, error) {
 	return res, nil
 }
 
-// Gets host by Host only if there is exactly 1 matching host.
+//HostGetByHost Gets host by Host only if there is exactly 1 matching host.
 func (api *API) HostGetByHost(host string) (*Host, error) {
 	var res *Host
 	hosts, err := api.HostsGet(Params{"filter": map[string]string{"host": host}})
@@ -122,7 +127,7 @@ func (api *API) HostGetByHost(host string) (*Host, error) {
 	return res, nil
 }
 
-// Wrapper for host.create: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/create
+//HostsCreate Wrapper for host.create: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/create
 func (api *API) HostsCreate(hosts Hosts) error {
 	response, err := api.CallWithError("host.create", hosts)
 	if err != nil {
@@ -132,12 +137,12 @@ func (api *API) HostsCreate(hosts Hosts) error {
 	result := response.Result.(map[string]interface{})
 	hostids := result["hostids"].([]interface{})
 	for i, id := range hostids {
-		hosts[i].HostId = id.(string)
+		hosts[i].HostID = id.(string)
 	}
 	return nil
 }
 
-// Wrapper for host.update: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/update
+//HostsUpdate Wrapper for host.update: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/update
 func (api *API) HostsUpdate(hosts Hosts) error {
 	_, err := api.CallWithError("host.update", hosts)
 	if err != nil {
@@ -146,29 +151,29 @@ func (api *API) HostsUpdate(hosts Hosts) error {
 	return nil
 }
 
-// Wrapper for host.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/delete
+//HostsDelete Wrapper for host.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/delete
 // Cleans HostId in all hosts elements if call succeed.
 func (api *API) HostsDelete(hosts Hosts) error {
 	ids := make([]string, len(hosts))
 	for i, host := range hosts {
-		ids[i] = host.HostId
+		ids[i] = host.HostID
 	}
 
-	err := api.HostsDeleteByIds(ids)
+	err := api.HostsDeleteByIDs(ids)
 	if err != nil {
 		return err
 	}
 	for i := range hosts {
-		hosts[i].HostId = ""
+		hosts[i].HostID = ""
 	}
 
 	return nil
 }
 
-// Wrapper for host.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/delete
-func (api *API) HostsDeleteByIds(ids []string) error {
-	hostIds := make([]map[string]string, len(ids))
-	for i, id := range ids {
+//HostsDeleteByIDs Wrapper for host.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/host/delete
+func (api *API) HostsDeleteByIDs(IDs []string) error {
+	hostIds := make([]map[string]string, len(IDs))
+	for i, id := range IDs {
 		hostIds[i] = map[string]string{"hostid": id}
 	}
 
@@ -176,7 +181,7 @@ func (api *API) HostsDeleteByIds(ids []string) error {
 	if err != nil {
 		// Zabbix 2.4 uses new syntax only
 		if e, ok := err.(*Error); ok && e.Code == -32500 {
-			response, err = api.CallWithError("host.delete", ids)
+			response, err = api.CallWithError("host.delete", IDs)
 			if err != nil {
 				return err
 			}
@@ -188,8 +193,8 @@ func (api *API) HostsDeleteByIds(ids []string) error {
 
 	result := response.Result.(map[string]interface{})
 	hostids := result["hostids"].([]interface{})
-	if len(ids) != len(hostids) {
-		err = &ExpectedMore{len(ids), len(hostids)}
+	if len(IDs) != len(hostids) {
+		err = &ExpectedMore{len(IDs), len(hostids)}
 		return err
 	}
 	return nil

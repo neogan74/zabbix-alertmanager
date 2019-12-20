@@ -235,9 +235,9 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Infof("hostgropup %v\n", hgid[0].GroupId)
+		log.Infof("hostgropup %v\n", hgid[0].GroupID)
 		//get hosts by hostgroupID
-		hstlist, err := api.HostsGetByHostGroupIds([]string{hgid[0].GroupId})
+		hstlist, err := api.HostsGetByHostGroupIDs([]string{hgid[0].GroupID})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -271,7 +271,7 @@ func main() {
 							UseIP: 1,
 						},
 					},
-					GroupIds: zabbix.HostGroupIds{zabbix.HostGroupId{hgid[0].GroupId}},
+					GroupIds: zabbix.HostGroupIDs{zabbix.HostGroupID{hgid[0].GroupID}},
 				})
 			}
 		}

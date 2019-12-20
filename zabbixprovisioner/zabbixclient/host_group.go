@@ -4,31 +4,34 @@ import (
 	reflector "github.com/neogan74/zabbix-alertmanager/zabbixprovisioner/zabbixutil"
 )
 
-type (
-	InternalType int
-)
+//InternalType ...
+type InternalType int
 
+//NotInternal ..
 const (
 	NotInternal InternalType = 0
 	Internal    InternalType = 1
 )
 
-// https://www.zabbix.com/documentation/2.2/manual/appendix/api/hostgroup/definitions
+//HostGroup https://www.zabbix.com/documentation/4.4/manual/appendix/api/hostgroup/definitions
 type HostGroup struct {
-	GroupId  string       `json:"groupid,omitempty"`
+	GroupID  string       `json:"groupid,omitempty"`
 	Name     string       `json:"name"`
 	Internal InternalType `json:"internal,omitempty"`
 }
 
+//HostGroups ....
 type HostGroups []HostGroup
 
-type HostGroupId struct {
-	GroupId string `json:"groupid"`
+//HostGroupID ...
+type HostGroupID struct {
+	GroupID string `json:"groupid"`
 }
 
-type HostGroupIds []HostGroupId
+//HostGroupIDs ...
+type HostGroupIDs []HostGroupID
 
-// Wrapper for hostgroup.get: https://www.zabbix.com/documentation/2.2/manual/appendix/api/hostgroup/get
+//HostGroupsGet Wrapper for hostgroup.get: https://www.zabbix.com/documentation/4.4/manual/appendix/api/hostgroup/get
 func (api *API) HostGroupsGet(params Params) (HostGroups, error) {
 	var res HostGroups
 	if _, present := params["output"]; !present {
@@ -43,8 +46,8 @@ func (api *API) HostGroupsGet(params Params) (HostGroups, error) {
 	return res, nil
 }
 
-// Gets host group by Id only if there is exactly 1 matching host group.
-func (api *API) HostGroupGetById(id string) (*HostGroup, error) {
+//HostGroupGetByID Gets host group by Id only if there is exactly 1 matching host group.
+func (api *API) HostGroupGetByID(id string) (*HostGroup, error) {
 	var res *HostGroup
 	groups, err := api.HostGroupsGet(Params{"groupids": id})
 	if err != nil {
@@ -61,7 +64,7 @@ func (api *API) HostGroupGetById(id string) (*HostGroup, error) {
 	return res, nil
 }
 
-// Wrapper for hostgroup.create: https://www.zabbix.com/documentation/2.2/manual/appendix/api/hostgroup/create
+//HostGroupsCreate Wrapper for hostgroup.create: https://www.zabbix.com/documentation/4.4/manual/appendix/api/hostgroup/create
 func (api *API) HostGroupsCreate(hostGroups HostGroups) error {
 	response, err := api.CallWithError("hostgroup.create", hostGroups)
 	if err != nil {
@@ -71,17 +74,17 @@ func (api *API) HostGroupsCreate(hostGroups HostGroups) error {
 	result := response.Result.(map[string]interface{})
 	groupids := result["groupids"].([]interface{})
 	for i, id := range groupids {
-		hostGroups[i].GroupId = id.(string)
+		hostGroups[i].GroupID = id.(string)
 	}
 	return nil
 }
 
-// Wrapper for hostgroup.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/hostgroup/delete
+//HostGroupsDelete Wrapper for hostgroup.delete: https://www.zabbix.com/documentation/4.4/manual/appendix/api/hostgroup/delete
 // Cleans GroupId in all hostGroups elements if call succeed.
 func (api *API) HostGroupsDelete(hostGroups HostGroups) error {
 	ids := make([]string, len(hostGroups))
 	for i, group := range hostGroups {
-		ids[i] = group.GroupId
+		ids[i] = group.GroupID
 	}
 
 	err := api.HostGroupsDeleteByIds(ids)
@@ -90,13 +93,13 @@ func (api *API) HostGroupsDelete(hostGroups HostGroups) error {
 	}
 
 	for i := range hostGroups {
-		hostGroups[i].GroupId = ""
+		hostGroups[i].GroupID = ""
 	}
 
 	return nil
 }
 
-// Wrapper for hostgroup.delete: https://www.zabbix.com/documentation/2.2/manual/appendix/api/hostgroup/delete
+//HostGroupsDeleteByIds Wrapper for hostgroup.delete: https://www.zabbix.com/documentation/4.4/manual/appendix/api/hostgroup/delete
 func (api *API) HostGroupsDeleteByIds(ids []string) error {
 	response, err := api.CallWithError("hostgroup.delete", ids)
 	if err != nil {

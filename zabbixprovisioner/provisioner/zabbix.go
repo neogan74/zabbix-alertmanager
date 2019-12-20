@@ -108,13 +108,13 @@ func (tmpl *CustomTemplate) AddItem(item *CustomItem) {
 	if existing, ok := tmpl.Items[item.Key]; ok {
 		if existing.Equal(item) {
 			if item.State == StateOld {
-				existing.ItemId = item.ItemId
+				existing.ItemID = item.ItemID
 				existing.State = StateEqual
 				updatedItem = existing
 			}
 		} else {
 			if item.State == StateOld {
-				existing.ItemId = item.ItemId
+				existing.ItemID = item.ItemID
 			}
 			existing.State = StateUpdated
 			updatedItem = existing
@@ -132,13 +132,13 @@ func (tmpl *CustomTemplate) AddTrigger(trigger *CustomTrigger) {
 	if existing, ok := tmpl.Triggers[trigger.Expression]; ok {
 		if existing.Equal(trigger) {
 			if trigger.State == StateOld {
-				existing.TriggerId = trigger.TriggerId
+				existing.TriggerID = trigger.TriggerID
 				existing.State = StateEqual
 				updatedTrigger = existing
 			}
 		} else {
 			if trigger.State == StateOld {
-				existing.TriggerId = trigger.TriggerId
+				existing.TriggerID = trigger.TriggerID
 			}
 			existing.State = StateUpdated
 			updatedTrigger = existing
@@ -190,7 +190,7 @@ func (z *CustomZabbix) GetTemplatesByState() (templateByState map[State]zabbix.T
 	newTemplateAmmount := 0
 	for _, tmpl := range z.Templates {
 		for hostGroupName := range tmpl.HostGroups {
-			tmpl.GroupIds = append(tmpl.GroupIds, zabbix.HostGroupId{GroupId: z.HostGroups[hostGroupName].GroupId})
+			tmpl.GroupIds = append(tmpl.GroupIds, zabbix.HostGroupID{GroupID: z.HostGroups[hostGroupName].GroupID})
 		}
 		templateByState[tmpl.State] = append(templateByState[tmpl.State], tmpl.Template)
 		if StateName[tmpl.State] == "New" || StateName[tmpl.State] == "Updated" {
@@ -212,13 +212,13 @@ func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 	if existing, ok := z.Hosts[host.Name]; ok {
 		if existing.Equal(host) {
 			if host.State == StateOld {
-				existing.HostId = host.HostId
+				existing.HostID = host.HostID
 				existing.State = StateEqual
 				updatedHost = existing
 			}
 		} else {
 			if host.State == StateOld {
-				existing.HostId = host.HostId
+				existing.HostID = host.HostID
 			}
 			existing.State = StateUpdated
 			updatedHost = existing
@@ -237,13 +237,13 @@ func (host *CustomHost) AddItem(item *CustomItem) {
 	if existing, ok := host.Items[item.Key]; ok {
 		if existing.Equal(item) {
 			if item.State == StateOld {
-				existing.ItemId = item.ItemId
+				existing.ItemID = item.ItemID
 				existing.State = StateEqual
 				updatedItem = existing
 			}
 		} else {
 			if item.State == StateOld {
-				existing.ItemId = item.ItemId
+				existing.ItemID = item.ItemID
 			}
 			existing.State = StateUpdated
 			updatedItem = existing
@@ -261,13 +261,13 @@ func (host *CustomHost) AddTrigger(trigger *CustomTrigger) {
 	if existing, ok := host.Triggers[trigger.Expression]; ok {
 		if existing.Equal(trigger) {
 			if trigger.State == StateOld {
-				existing.TriggerId = trigger.TriggerId
+				existing.TriggerID = trigger.TriggerID
 				existing.State = StateEqual
 				updatedTrigger = existing
 			}
 		} else {
 			if trigger.State == StateOld {
-				existing.TriggerId = trigger.TriggerId
+				existing.TriggerID = trigger.TriggerID
 			}
 			existing.State = StateUpdated
 			updatedTrigger = existing
@@ -405,7 +405,7 @@ func (z *CustomZabbix) GetHostsByState() (hostByState map[State]zabbix.Hosts) {
 	newHostAmmount := 0
 	for _, host := range z.Hosts {
 		for hostGroupName := range host.HostGroups {
-			host.GroupIds = append(host.GroupIds, zabbix.HostGroupId{GroupId: z.HostGroups[hostGroupName].GroupId})
+			host.GroupIds = append(host.GroupIds, zabbix.HostGroupID{GroupID: z.HostGroups[hostGroupName].GroupID})
 		}
 		hostByState[host.State] = append(hostByState[host.State], host.Host)
 		if StateName[host.State] == "New" || StateName[host.State] == "Updated" {
@@ -459,7 +459,7 @@ func (z *CustomZabbix) PropagateCreatedTemplates(templates zabbix.Templates) {
 func (z *CustomZabbix) PropagateCreatedHosts(hosts zabbix.Hosts) {
 	for _, newHost := range hosts {
 		if host, ok := z.Hosts[newHost.Name]; ok {
-			host.HostId = newHost.HostId
+			host.HostID = newHost.HostID
 		}
 	}
 }
@@ -468,7 +468,7 @@ func (z *CustomZabbix) PropagateCreatedHosts(hosts zabbix.Hosts) {
 func (z *CustomZabbix) PropagateCreatedHostGroups(hostGroups zabbix.HostGroups) {
 	for _, newHostGroup := range hostGroups {
 		if hostGroup, ok := z.HostGroups[newHostGroup.Name]; ok {
-			hostGroup.GroupId = newHostGroup.GroupId
+			hostGroup.GroupID = newHostGroup.GroupID
 		}
 	}
 }
@@ -477,7 +477,7 @@ func (z *CustomZabbix) PropagateCreatedHostGroups(hostGroups zabbix.HostGroups) 
 func (host *CustomHost) PropagateCreatedApplications(applications zabbix.Applications) {
 
 	for _, application := range applications {
-		host.Applications[application.Name].ApplicationId = application.ApplicationId
+		host.Applications[application.Name].ApplicationID = application.ApplicationID
 	}
 }
 
@@ -493,10 +493,10 @@ func (host *CustomHost) GetItemsByState() (itemsByState map[State]zabbix.Items) 
 
 	newItemAmmount := 0
 	for _, item := range host.Items {
-		item.HostId = host.HostId
+		item.HostID = host.HostID
 		item.Item.ApplicationIds = []string{}
 		for appName := range item.Applications {
-			item.Item.ApplicationIds = append(item.Item.ApplicationIds, host.Applications[appName].ApplicationId)
+			item.Item.ApplicationIds = append(item.Item.ApplicationIds, host.Applications[appName].ApplicationID)
 		}
 		itemsByState[item.State] = append(itemsByState[item.State], item.Item)
 		if StateName[item.State] == "New" || StateName[item.State] == "Updated" {
@@ -547,7 +547,7 @@ func (host *CustomHost) GetApplicationsByState() (applicationsByState map[State]
 	}
 	newAppAmmount := 0
 	for _, application := range host.Applications {
-		application.Application.HostId = host.HostId
+		application.Application.HostID = host.HostID
 		applicationsByState[application.State] = append(applicationsByState[application.State], application.Application)
 		if StateName[application.State] == "New" || StateName[application.State] == "Updated" {
 			newAppAmmount++

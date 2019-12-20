@@ -118,6 +118,8 @@ func (p *Provisioner) Run() error {
 		HostGroups: map[string]*CustomHostGroup{},
 	}
 
+	//
+
 	//All hosts will have the rules which were only written for them
 	for _, host := range p.hosts {
 		if err := p.LoadRulesFromPrometheus(host); err != nil {
@@ -125,6 +127,9 @@ func (p *Provisioner) Run() error {
 		}
 	}
 
+	if err := p.LoadTargetsFromPrometheus(); err != nil {
+		return errors.Wrapf(err, "error loading prometheus targets from given URL: %s", p.prometheusURL)
+	}
 	if err := p.LoadDataFromZabbix(); err != nil {
 		return errors.Wrap(err, "error loading zabbix rules")
 	}
@@ -137,8 +142,10 @@ func (p *Provisioner) Run() error {
 }
 
 //LoadTargetsFromPrometheus ...
-func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
-	resp, err := http.Get("http://51.15.213.9:9090/api/v1/targets")
+func (p *Provisioner) LoadTargetsFromPrometheus() error {
+	targetsPath := "/api/v1/targets"
+	promURL := fmt.Sprintf("%s%s", p.prometheusURL, targetsPath)
+	resp, err := http.Get(promURL)
 	if err != nil {
 		log.Infof("Error while get targets: %v\n", err)
 		os.Exit(1)
@@ -184,7 +191,7 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 			},
 			HostGroups: make(map[string]struct{}, 1),
 		}
-		hostGroupName := "Prom2zabbix"
+		hostGroupName := "Templates/Prom2zabbix"
 		p.AddHostGroup(&CustomHostGroup{
 			State: StateNew,
 			HostGroup: zabbix.HostGroup{
@@ -204,7 +211,7 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 		return errors.Wrap(err, "error loading rules")
 	}
 
-	log.Infof("Prometheus Rules for host - %v loaded: %v", hostConfig.Name, len(rules))
+	log.Infof("Prometheus Rules for template - %v loaded: %v", hostConfig.Name, len(rules))
 
 	newTemplate := &CustomTemplate{
 		State: StateNew,
@@ -242,7 +249,7 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 			Item: zabbix.Item{
 				Name:         rule.Name,
 				Key:          key,
-				HostId:       "", //To be filled when the host will be created
+				HostID:       "", //To be filled when the host will be created
 				Type:         2,  //Trapper
 				ValueType:    3,
 				History:      hostConfig.ItemDefaultHistory,
@@ -325,7 +332,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 	if len(hostNames) == 0 {
 		return errors.Errorf("error no hosts are defined")
 	}
-
+	// Getting ZABBIX HOSTGROUPS //
 	zabbixHostGroups, err := p.api.HostGroupsGet(zabbix.Params{
 		"output": "extend",
 		"filter": map[string][]string{
@@ -343,6 +350,106 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 		})
 	}
 
+	// Getting ZABBIX TEMPLATES //
+	templateNames := []string{}
+	if len(templateNames) == 0 {
+		return errors.Errorf("error no templates are defined")
+	}
+	zabbixTemplates, err := p.api.TemplateGet(zabbix.Params{
+		"output": "extend",
+		"filter": map[string][]string{
+			"host": templateNames,
+		},
+	})
+
+	for _, zabbixTemplate := range zabbixTemplates {
+		zabbixHostGroups, err := p.api.HostGroupsGet(zabbix.Params{
+			"output":      "extend",
+			"templateids": zabbixTemplate.TemplateID,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "error getting hostgroup, hostid: %v", zabbixTemplate.TemplateID)
+		}
+		hostGroups := make(map[string]struct{}, len(zabbixHostGroups))
+		for _, zabbixHostGroup := range zabbixHostGroups {
+			hostGroups[zabbixHostGroup.Name] = struct{}{}
+		}
+
+		oldTemplate := p.AddTemplate(&CustomTemplate{
+			State:        StateOld,
+			Template:     zabbixTemplate,
+			HostGroups:   hostGroups,
+			Items:        map[string]*CustomItem{},
+			Applications: map[string]*CustomApplication{},
+			Triggers:     map[string]*CustomTrigger{},
+		})
+		log.Debugf("Load template from Zabbix: %+v", oldTemplate)
+		zabbixApplications, err := p.api.ApplicationsGet(zabbix.Params{
+			"output":      "extend",
+			"templateids": oldTemplate.TemplateID,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "error getting application, hostid: %v", oldTemplate.TemplateID)
+		}
+
+		for _, zabbixApplication := range zabbixApplications {
+			oldTemplate.AddApplication(&CustomApplication{
+				State:       StateOld,
+				Application: zabbixApplication,
+			})
+		}
+
+		zabbixItems, err := p.api.ItemsGet(zabbix.Params{
+			"output":      "extend",
+			"templateids": oldTemplate.TemplateID,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "error getting item, hostid: %v", oldTemplate.Template.TemplateID)
+		}
+
+		for _, zabbixItem := range zabbixItems {
+			newItem := &CustomItem{
+				State: StateOld,
+				Item:  zabbixItem,
+			}
+
+			zabbixApplications, err := p.api.ApplicationsGet(zabbix.Params{
+				"output":  "extend",
+				"itemids": zabbixItem.ItemID,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "error getting item, itemid: %v", oldTemplate.Template.TemplateID)
+			}
+
+			newItem.Applications = make(map[string]struct{}, len(zabbixApplications))
+			for _, zabbixApplication := range zabbixApplications {
+				newItem.Applications[zabbixApplication.Name] = struct{}{}
+			}
+
+			log.Debugf("Loading item from Zabbix: %+v", newItem)
+			oldTemplate.AddItem(newItem)
+		}
+
+		zabbixTriggers, err := p.api.TriggersGet(zabbix.Params{
+			"output":           "extend",
+			"templateids":      oldTemplate.TemplateID,
+			"expandExpression": true,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "error getting zabbix triggers, hostids: %v", oldTemplate.Template.TemplateID)
+		}
+
+		for _, zabbixTrigger := range zabbixTriggers {
+			newTrigger := &CustomTrigger{
+				State:   StateOld,
+				Trigger: zabbixTrigger,
+			}
+
+			log.Debugf("Loading trigger from Zabbix: %+v", newTrigger)
+			oldTemplate.AddTrigger(newTrigger)
+		}
+	}
+	/// Geting ZABBIX HOSTS
 	zabbixHosts, err := p.api.HostsGet(zabbix.Params{
 		"output": "extend",
 		"selectInventory": []string{
@@ -360,10 +467,10 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 	for _, zabbixHost := range zabbixHosts {
 		zabbixHostGroups, err := p.api.HostGroupsGet(zabbix.Params{
 			"output":  "extend",
-			"hostids": zabbixHost.HostId,
+			"hostids": zabbixHost.HostID,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "error getting hostgroup, hostid: %v", zabbixHost.HostId)
+			return errors.Wrapf(err, "error getting hostgroup, hostid: %v", zabbixHost.HostID)
 		}
 
 		hostGroups := make(map[string]struct{}, len(zabbixHostGroups))
@@ -386,10 +493,10 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 		zabbixApplications, err := p.api.ApplicationsGet(zabbix.Params{
 			"output":  "extend",
-			"hostids": oldHost.HostId,
+			"hostids": oldHost.HostID,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "error getting application, hostid: %v", oldHost.HostId)
+			return errors.Wrapf(err, "error getting application, hostid: %v", oldHost.HostID)
 		}
 
 		for _, zabbixApplication := range zabbixApplications {
@@ -401,10 +508,10 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 		zabbixItems, err := p.api.ItemsGet(zabbix.Params{
 			"output":  "extend",
-			"hostids": oldHost.Host.HostId,
+			"hostids": oldHost.Host.HostID,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "error getting item, hostid: %v", oldHost.Host.HostId)
+			return errors.Wrapf(err, "error getting item, hostid: %v", oldHost.Host.HostID)
 		}
 
 		for _, zabbixItem := range zabbixItems {
@@ -415,10 +522,10 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 			zabbixApplications, err := p.api.ApplicationsGet(zabbix.Params{
 				"output":  "extend",
-				"itemids": zabbixItem.ItemId,
+				"itemids": zabbixItem.ItemID,
 			})
 			if err != nil {
-				return errors.Wrapf(err, "error getting item, itemid: %v", oldHost.Host.HostId)
+				return errors.Wrapf(err, "error getting item, itemid: %v", oldHost.Host.HostID)
 			}
 
 			newItem.Applications = make(map[string]struct{}, len(zabbixApplications))
@@ -432,11 +539,11 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 		zabbixTriggers, err := p.api.TriggersGet(zabbix.Params{
 			"output":           "extend",
-			"hostids":          oldHost.Host.HostId,
+			"hostids":          oldHost.Host.HostID,
 			"expandExpression": true,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "error getting zabbix triggers, hostids: %v", oldHost.Host.HostId)
+			return errors.Wrapf(err, "error getting zabbix triggers, hostids: %v", oldHost.Host.HostID)
 		}
 
 		for _, zabbixTrigger := range zabbixTriggers {
