@@ -100,6 +100,111 @@ func (z *CustomZabbix) AddTemplate(tmpl *CustomTemplate) (updatedTemplate *Custo
 	return updatedTemplate
 }
 
+//AddItem CustomTemplate method
+func (tmpl *CustomTemplate) AddItem(item *CustomItem) {
+
+	updatedItem := item
+
+	if existing, ok := tmpl.Items[item.Key]; ok {
+		if existing.Equal(item) {
+			if item.State == StateOld {
+				existing.ItemId = item.ItemId
+				existing.State = StateEqual
+				updatedItem = existing
+			}
+		} else {
+			if item.State == StateOld {
+				existing.ItemId = item.ItemId
+			}
+			existing.State = StateUpdated
+			updatedItem = existing
+		}
+	}
+
+	tmpl.Items[item.Key] = updatedItem
+}
+
+//AddTrigger CustomTemplate method
+func (tmpl *CustomTemplate) AddTrigger(trigger *CustomTrigger) {
+
+	updatedTrigger := trigger
+
+	if existing, ok := tmpl.Triggers[trigger.Expression]; ok {
+		if existing.Equal(trigger) {
+			if trigger.State == StateOld {
+				existing.TriggerId = trigger.TriggerId
+				existing.State = StateEqual
+				updatedTrigger = existing
+			}
+		} else {
+			if trigger.State == StateOld {
+				existing.TriggerId = trigger.TriggerId
+			}
+			existing.State = StateUpdated
+			updatedTrigger = existing
+		}
+	}
+
+	tmpl.Triggers[trigger.Expression] = updatedTrigger
+}
+
+//AddApplication ...
+func (tmpl *CustomTemplate) AddApplication(application *CustomApplication) {
+	if _, ok := tmpl.Applications[application.Name]; ok {
+		if application.State == StateOld {
+			application.State = StateEqual
+		}
+	}
+	tmpl.Applications[application.Name] = application
+}
+
+//Equal ...
+func (i *CustomTemplate) Equal(j *CustomTemplate) bool {
+	if i.Name != j.Name {
+		return false
+	}
+
+	if len(i.HostGroups) != len(j.HostGroups) {
+		return false
+	}
+
+	for hostGroupName := range i.HostGroups {
+		if _, ok := j.HostGroups[hostGroupName]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+//GetTemplatesByState ...
+func (z *CustomZabbix) GetTemplatesByState() (templateByState map[State]zabbix.Templates) {
+
+	templateByState = map[State]zabbix.Templates{
+		StateNew:     zabbix.Templates{},
+		StateOld:     zabbix.Templates{},
+		StateUpdated: zabbix.Templates{},
+		StateEqual:   zabbix.Templates{},
+	}
+
+	newTemplateAmmount := 0
+	for _, tmpl := range z.Templates {
+		for hostGroupName := range tmpl.HostGroups {
+			tmpl.GroupIds = append(tmpl.GroupIds, zabbix.HostGroupId{GroupId: z.HostGroups[hostGroupName].GroupId})
+		}
+		templateByState[tmpl.State] = append(templateByState[tmpl.State], tmpl.Template)
+		if StateName[tmpl.State] == "New" || StateName[tmpl.State] == "Updated" {
+			newTemplateAmmount++
+			log.Infof("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
+		} else {
+			log.Debugf("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
+		}
+	}
+
+	log.Infof("HOSTS, total: %v, new or updated: %v", len(z.Hosts), newTemplateAmmount)
+	return templateByState
+}
+
 //AddHost ...
 func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 	updatedHost = host
@@ -124,7 +229,7 @@ func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 	return updatedHost
 }
 
-//AddItem ...
+//AddItem CusomHost method
 func (host *CustomHost) AddItem(item *CustomItem) {
 
 	updatedItem := item
@@ -190,25 +295,6 @@ func (z *CustomZabbix) AddHostGroup(hostGroup *CustomHostGroup) {
 		}
 	}
 	z.HostGroups[hostGroup.Name] = hostGroup
-}
-
-//Equal ...
-func (i *CustomTemplate) Equal(j *CustomTemplate) bool {
-	if i.Name != j.Name {
-		return false
-	}
-
-	if len(i.HostGroups) != len(j.HostGroups) {
-		return false
-	}
-
-	for hostGroupName := range i.HostGroups {
-		if _, ok := j.HostGroups[hostGroupName]; !ok {
-			return false
-		}
-	}
-
-	return true
 }
 
 //Equal ...
@@ -304,34 +390,6 @@ func (i *CustomTrigger) Equal(j *CustomTrigger) bool {
 	}
 
 	return true
-}
-
-//GetTemplatesByState ...
-func (z *CustomZabbix) GetTemplatesByState() (templateByState map[State]zabbix.Templates) {
-
-	templateByState = map[State]zabbix.Templates{
-		StateNew:     zabbix.Templates{},
-		StateOld:     zabbix.Templates{},
-		StateUpdated: zabbix.Templates{},
-		StateEqual:   zabbix.Templates{},
-	}
-
-	newTemplateAmmount := 0
-	for _, tmpl := range z.Templates {
-		for hostGroupName := range tmpl.HostGroups {
-			tmpl.GroupIds = append(tmpl.GroupIds, zabbix.HostGroupId{GroupId: z.HostGroups[hostGroupName].GroupId})
-		}
-		templateByState[tmpl.State] = append(templateByState[tmpl.State], tmpl.Template)
-		if StateName[tmpl.State] == "New" || StateName[tmpl.State] == "Updated" {
-			newTemplateAmmount++
-			log.Infof("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
-		} else {
-			log.Debugf("GetHostByState = State: %s, Name: %s", StateName[tmpl.State], tmpl.Template)
-		}
-	}
-
-	log.Infof("HOSTS, total: %v, new or updated: %v", len(z.Hosts), newTemplateAmmount)
-	return templateByState
 }
 
 //GetHostsByState ...
