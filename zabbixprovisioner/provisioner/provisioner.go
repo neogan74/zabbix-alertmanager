@@ -125,11 +125,11 @@ func (p *Provisioner) Run() error {
 		if err := p.LoadRulesFromPrometheus(host); err != nil {
 			return errors.Wrapf(err, "error loading prometheus rules, file: %s", host.HostAlertsDir)
 		}
+		if err := p.LoadTargetsFromPrometheus(host); err != nil {
+			return errors.Wrapf(err, "error loading prometheus targets from given URL: %s", p.prometheusURL)
+		}
 	}
 
-	if err := p.LoadTargetsFromPrometheus(); err != nil {
-		return errors.Wrapf(err, "error loading prometheus targets from given URL: %s", p.prometheusURL)
-	}
 	if err := p.LoadDataFromZabbix(); err != nil {
 		return errors.Wrap(err, "error loading zabbix rules")
 	}
@@ -142,7 +142,7 @@ func (p *Provisioner) Run() error {
 }
 
 //LoadTargetsFromPrometheus ...
-func (p *Provisioner) LoadTargetsFromPrometheus() error {
+func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 	targetsPath := "/api/v1/targets"
 	promURL := fmt.Sprintf("%s%s", p.prometheusURL, targetsPath)
 	resp, err := http.Get(promURL)
@@ -191,7 +191,7 @@ func (p *Provisioner) LoadTargetsFromPrometheus() error {
 			},
 			HostGroups: make(map[string]struct{}, 1),
 		}
-		hostGroupName := "Templates/Prom2zabbix"
+		hostGroupName := hostConfig.HostGroups[0]
 		p.AddHostGroup(&CustomHostGroup{
 			State: StateNew,
 			HostGroup: zabbix.HostGroup{
@@ -323,9 +323,11 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 //LoadDataFromZabbix Update created hosts with the current state in Zabbix
 func (p *Provisioner) LoadDataFromZabbix() error {
 	hostNames := make([]string, len(p.hosts))
+	templateNames := []string{}
 	hostGroupNames := []string{}
 	for i := range p.hosts {
 		hostNames[i] = p.hosts[i].Name
+		templateNames = append(templateNames, p.hosts[i].Name)
 		hostGroupNames = append(hostGroupNames, p.hosts[i].HostGroups...)
 	}
 
@@ -351,7 +353,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 	}
 
 	// Getting ZABBIX TEMPLATES //
-	templateNames := []string{}
+
 	if len(templateNames) == 0 {
 		return errors.Errorf("error no templates are defined")
 	}
@@ -450,15 +452,13 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 		}
 	}
 	/// Geting ZABBIX HOSTS
+	for _, hg := range p.HostGroups {
+		log.Debugf("HG: %v %s ", hg, hg.GroupID)
+	}
+
 	zabbixHosts, err := p.api.HostsGet(zabbix.Params{
-		"output": "extend",
-		"selectInventory": []string{
-			"tag",
-			"deployment_status",
-		},
-		"filter": map[string][]string{
-			"host": hostNames,
-		},
+		"output":   "extend",
+		"groupids": "17",
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error getting hosts: %v", hostNames)

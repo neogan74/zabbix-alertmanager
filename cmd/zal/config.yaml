@@ -1,7 +1,7 @@
 # Name of the host in zabbix
-- name: infra
+- name: prom2zbx
   hostGroups:
-    - prometheus
+    - Template/prom2zabbix
   # tag and deploymentStatus are inventory fields currently supported for an host
   tag: prometheus
   deploymentStatus: 0
