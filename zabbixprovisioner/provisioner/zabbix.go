@@ -78,7 +78,7 @@ type CustomZabbix struct {
 	HostGroups map[string]*CustomHostGroup
 }
 
-//AddTemaplate ...
+//AddTemplate ...
 func (z *CustomZabbix) AddTemplate(tmpl *CustomTemplate) (updatedTemplate *CustomTemplate) {
 	updatedTemplate = tmpl
 	if existing, ok := z.Templates[tmpl.Name]; ok {
@@ -159,16 +159,16 @@ func (tmpl *CustomTemplate) AddApplication(application *CustomApplication) {
 }
 
 //Equal ...
-func (i *CustomTemplate) Equal(j *CustomTemplate) bool {
-	if i.Name != j.Name {
+func (tmpl *CustomTemplate) Equal(j *CustomTemplate) bool {
+	if tmpl.Name != j.Name {
 		return false
 	}
 
-	if len(i.HostGroups) != len(j.HostGroups) {
+	if len(tmpl.HostGroups) != len(j.HostGroups) {
 		return false
 	}
 
-	for hostGroupName := range i.HostGroups {
+	for hostGroupName := range tmpl.HostGroups {
 		if _, ok := j.HostGroups[hostGroupName]; !ok {
 			return false
 		}
@@ -298,26 +298,26 @@ func (z *CustomZabbix) AddHostGroup(hostGroup *CustomHostGroup) {
 }
 
 //Equal ...
-func (i *CustomHost) Equal(j *CustomHost) bool {
-	if i.Name != j.Name {
+func (host *CustomHost) Equal(j *CustomHost) bool {
+	if host.Name != j.Name {
 		return false
 	}
 
-	if len(i.HostGroups) != len(j.HostGroups) {
+	if len(host.HostGroups) != len(j.HostGroups) {
 		return false
 	}
 
-	for hostGroupName := range i.HostGroups {
+	for hostGroupName := range host.HostGroups {
 		if _, ok := j.HostGroups[hostGroupName]; !ok {
 			return false
 		}
 	}
 
-	if len(i.Inventory) != len(j.Inventory) {
+	if len(host.Inventory) != len(j.Inventory) {
 		return false
 	}
 
-	for key, valueI := range i.Inventory {
+	for key, valueI := range host.Inventory {
 		if valueJ, ok := j.Inventory[key]; !ok {
 			return false
 		} else if valueJ != valueI {
@@ -446,28 +446,28 @@ func (z *CustomZabbix) GetHostGroupsByState() (hostGroupsByState map[State]zabbi
 	return hostGroupsByState
 }
 
-//PropagateCreatedHosts ...
-func (zabbix *CustomZabbix) PropagateCreatedTemplates(templates zabbix.Templates) {
+//PropagateCreatedTemplates ...
+func (z *CustomZabbix) PropagateCreatedTemplates(templates zabbix.Templates) {
 	for _, newTemplate := range templates {
-		if tmpl, ok := zabbix.Templates[newTemplate.Name]; ok {
+		if tmpl, ok := z.Templates[newTemplate.Name]; ok {
 			tmpl.TemplateID = newTemplate.TemplateID
 		}
 	}
 }
 
 //PropagateCreatedHosts ...
-func (zabbix *CustomZabbix) PropagateCreatedHosts(hosts zabbix.Hosts) {
+func (z *CustomZabbix) PropagateCreatedHosts(hosts zabbix.Hosts) {
 	for _, newHost := range hosts {
-		if host, ok := zabbix.Hosts[newHost.Name]; ok {
+		if host, ok := z.Hosts[newHost.Name]; ok {
 			host.HostId = newHost.HostId
 		}
 	}
 }
 
 //PropagateCreatedHostGroups ...
-func (zabbix *CustomZabbix) PropagateCreatedHostGroups(hostGroups zabbix.HostGroups) {
+func (z *CustomZabbix) PropagateCreatedHostGroups(hostGroups zabbix.HostGroups) {
 	for _, newHostGroup := range hostGroups {
-		if hostGroup, ok := zabbix.HostGroups[newHostGroup.Name]; ok {
+		if hostGroup, ok := z.HostGroups[newHostGroup.Name]; ok {
 			hostGroup.GroupId = newHostGroup.GroupId
 		}
 	}
