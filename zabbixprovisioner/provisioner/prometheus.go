@@ -9,12 +9,14 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+//PrometheusAlertRules struct for grouping rules
 type PrometheusAlertRules struct {
 	Groups []struct {
 		Rules []PrometheusRule `yaml:"rules"`
 	} `yaml:"groups"`
 }
 
+//PrometheusRule struct representing
 type PrometheusRule struct {
 	Name        string            `yaml:"alert"`
 	Annotations map[string]string `yaml:"annotations"`
@@ -22,6 +24,7 @@ type PrometheusRule struct {
 	Labels      map[string]string `yaml:"labels"`
 }
 
+//LoadPrometheusRulesFromDir function for loading prometheus rule from given directory
 func LoadPrometheusRulesFromDir(dir string) ([]PrometheusRule, error) {
 	filesInDir, err := ioutil.ReadDir(dir)
 	if err != nil {
