@@ -33,15 +33,14 @@ func (api *API) TemplateGet(params Params) (Templates, error) {
 
 //TemplateCreate ..
 func (api *API) TemplateCreate(tmpls Templates) error {
-	// resp, err := api.CallWithError("template.create",tmpls)
-
-	// if err != nil {
-	// 	return err
-	// }
-	// 	res := resp.Result.(map[string]interface{})
-	// 	tmplids := res["templateids"].([]interface{})
-	// 	for i,tmplid := range tmplids {
-	// 		tmpls[i].TemplateID = id.(string)
-	// 	}
+	resp, err := api.CallWithError("template.create", tmpls)
+	if err != nil {
+		return err
+	}
+	res := resp.Result.(map[string]interface{})
+	tmplids := res["templateids"].([]interface{})
+	for i, tmplid := range tmplids {
+		tmpls[i].TemplateID = tmplid.(string)
+	}
 	return nil
 }
