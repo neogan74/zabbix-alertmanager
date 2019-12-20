@@ -16,6 +16,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+//HostConfig structure
 type HostConfig struct {
 	Name                    string            `yaml:"name"`
 	HostGroups              []string          `yaml:"hostGroups"`
@@ -29,7 +30,8 @@ type HostConfig struct {
 	TriggerTags             map[string]string `yaml:"triggerTags"`
 }
 
-type TargetsList struct {
+//Targets structure for Prometheus api/v1/targets resposce
+type Targets struct {
 	Status string `json:"status"`
 	Data   struct {
 		ActiveTargets []struct {
@@ -54,6 +56,7 @@ type TargetsList struct {
 	} `json:"data"`
 }
 
+//Provisioner structure for syncronization objects between zabbix and prometheus alerts rules.
 type Provisioner struct {
 	api           *zabbix.API
 	keyPrefix     string
@@ -62,19 +65,26 @@ type Provisioner struct {
 	*CustomZabbix
 }
 
+/*New function create provisioning object
+gets parameters:
+- prometheusUrl - URL for access to prometheus
+  keyPrefix - zabbix item key prefix like prom.metric
+  ur; - Zabbix API URL
+  user,password -  Zabbix API credentails
+  hosts - list of hosts which will be created, updated in zabbix
+*/
 func New(prometheusUrl, keyPrefix, url, user, password string, hosts []HostConfig) (*Provisioner, error) {
 	transport := http.DefaultTransport
-
+	//Zabbix API init
 	api := zabbix.NewAPI(url)
 	api.SetClient(&http.Client{
 		Transport: transport,
 	})
-
+	// try to login
 	_, err := api.Login(user, password)
 	if err != nil {
 		return nil, errors.Wrap(err, "error while login to zabbix api")
 	}
-
 	return &Provisioner{
 		api:           api,
 		keyPrefix:     keyPrefix,
@@ -83,6 +93,7 @@ func New(prometheusUrl, keyPrefix, url, user, password string, hosts []HostConfi
 	}, nil
 }
 
+//LoadHostConfigFromFile function
 func LoadHostConfigFromFile(filename string) ([]HostConfig, error) {
 	configFile, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -99,9 +110,11 @@ func LoadHostConfigFromFile(filename string) ([]HostConfig, error) {
 	return hosts, nil
 }
 
+//Run main function for start provisioning
 func (p *Provisioner) Run() error {
 	p.CustomZabbix = &CustomZabbix{
 		Hosts:      map[string]*CustomHost{},
+		Templates:  map[string]*CustomTemplate{},
 		HostGroups: map[string]*CustomHostGroup{},
 	}
 
@@ -137,7 +150,7 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 		log.Fatalf("Error with body: %v\n", err)
 	}
 	var targets []string
-	var targetsjs TargetsList
+	var targetsjs Targets
 	err = json.Unmarshal(data, &targetsjs)
 	if err != nil {
 		log.Fatalf("Error while JSON unmarshal %s", err)
@@ -193,35 +206,17 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 
 	log.Infof("Prometheus Rules for host - %v loaded: %v", hostConfig.Name, len(rules))
 
-	newHost := &CustomHost{
+	newTemplate := &CustomTemplate{
 		State: StateNew,
-		Host: zabbix.Host{
-			Host:          hostConfig.Name,
-			Available:     1,
-			Name:          hostConfig.Name,
-			Status:        0,
-			InventoryMode: zabbix.InventoryManual,
-			Inventory: map[string]string{
-				"deployment_status": hostConfig.DeploymentStatus,
-				"tag":               hostConfig.Tag,
-			},
-			Interfaces: zabbix.HostInterfaces{
-				zabbix.HostInterface{
-					DNS:   "",
-					IP:    "127.0.0.1",
-					Main:  1,
-					Port:  "10050",
-					Type:  1,
-					UseIP: 1,
-				},
-			},
+		Template: zabbix.Template{
+			Name:        hostConfig.Name,
+			DisplayName: hostConfig.Name,
 		},
-		HostGroups:   make(map[string]struct{}, len(hostConfig.HostGroups)),
+		HostGroups:   make(map[string]struct{}, 1),
 		Items:        map[string]*CustomItem{},
 		Applications: map[string]*CustomApplication{},
 		Triggers:     map[string]*CustomTrigger{},
 	}
-
 	for _, hostGroupName := range hostConfig.HostGroups {
 		p.AddHostGroup(&CustomHostGroup{
 			State: StateNew,
@@ -230,7 +225,7 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 			},
 		})
 
-		newHost.HostGroups[hostGroupName] = struct{}{}
+		newTemplate.HostGroups[hostGroupName] = struct{}{}
 	}
 
 	// Parse Prometheus rules and create corresponding items/triggers and applications for this host
@@ -261,7 +256,7 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 			State: StateNew,
 			Trigger: zabbix.Trigger{
 				Description: rule.Name,
-				Expression:  fmt.Sprintf("{%s:%s.last()}<>0", newHost.Name, key),
+				Expression:  fmt.Sprintf("{%s:%s.last()}<>0", newTemplate.Name, key),
 				ManualClose: 1,
 				Tags:        triggerTags,
 			},
@@ -291,12 +286,12 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 		// Add the special "No Data" trigger if requested
 		if delay, ok := rule.Annotations["zabbix_trigger_nodata"]; ok {
 			newTrigger.Trigger.Description = fmt.Sprintf("%s - no data for the last %s seconds", newTrigger.Trigger.Description, delay)
-			newTrigger.Trigger.Expression = fmt.Sprintf("{%s:%s.nodata(%s)}", newHost.Name, key, delay)
+			newTrigger.Trigger.Expression = fmt.Sprintf("{%s:%s.nodata(%s)}", newTemplate.Name, key, delay)
 		}
 
 		// If no applications are found in the rule, add the default application declared in the configuration
 		if len(newItem.Applications) == 0 {
-			newHost.AddApplication(&CustomApplication{
+			newTemplate.AddApplication(&CustomApplication{
 				State: StateNew,
 				Application: zabbix.Application{
 					Name: hostConfig.ItemDefaultApplication,
@@ -306,14 +301,14 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 		}
 
 		log.Debugf("Loading item from Prometheus: %+v", newItem)
-		newHost.AddItem(newItem)
+		newTemplate.AddItem(newItem)
 
 		log.Debugf("Loading trigger from Prometheus: %+v", newTrigger)
-		newHost.AddTrigger(newTrigger)
+		newTemplate.AddTrigger(newTrigger)
 
 	}
-	log.Debugf("Host from Prometheus: %+v", newHost)
-	p.AddHost(newHost)
+	log.Debugf("Host from Prometheus: %+v", newTemplate)
+	p.AddTemplate(newTemplate)
 
 	return nil
 }
