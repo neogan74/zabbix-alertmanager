@@ -273,9 +273,8 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 			State: StateNew,
 			Trigger: zabbix.Trigger{
 				Description: rule.Name,
-				Expression:  fmt.Sprintf("{%s:%s.last()}<>0", newTemplate.Name, key),
+				Expression:  fmt.Sprintf("{%s:%s.last()}>0", newTemplate.Name, key),
 				ManualClose: 1,
-				Tags:        triggerTags,
 			},
 		}
 
@@ -326,6 +325,7 @@ func (p *Provisioner) LoadRulesFromPrometheus(hostConfig HostConfig) error {
 	}
 	log.Debugf("Template for Prometheus: %+v", newTemplate)
 	p.AddTemplate(newTemplate)
+	log.Debugf("------------Templates: %+v", p.Templates["prom2zbx"])
 
 	return nil
 }
@@ -544,6 +544,7 @@ func (p *Provisioner) ApplyChanges() error {
 	}
 	if len(templatesByState[StateUpdated]) != 0 {
 		log.Debugf("Updating Templates: %+v\n", templatesByState[StateUpdated])
+		log.Debugf("Updating Templates: %+v\n", templatesByState)
 		err := p.api.TemplatesUpdate(templatesByState[StateUpdated])
 		if err != nil {
 			return errors.Wrap(err, "Failed in updating host")

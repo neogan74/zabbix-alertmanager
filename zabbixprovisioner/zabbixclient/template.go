@@ -8,7 +8,7 @@ import (
 
 //Template ...
 type Template struct {
-	TemplateID  string `json:"templateid:omitempty"`
+	TemplateID  string `json:"templateid,omitempty"`
 	Name        string `json:"host,omitempty"`
 	Description string `json:"description,omitempty"`
 	DisplayName string `json:"name,omitempty"`

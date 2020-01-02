@@ -82,7 +82,7 @@ type CustomZabbix struct {
 func (z *CustomZabbix) AddTemplate(tmpl *CustomTemplate) (updatedTemplate *CustomTemplate) {
 	updatedTemplate = tmpl
 	if existing, ok := z.Templates[tmpl.Name]; ok {
-		log.Debugf("===In ADDTEMPALTE ===: %+v", existing, tmpl)
+		log.Debugf("===In ADDTEMPALTE ===: %+v ||| %+v", existing, tmpl)
 		if existing.Equal(tmpl) {
 			if tmpl.State == StateOld {
 				existing.TemplateID = tmpl.TemplateID
@@ -219,7 +219,7 @@ func (tmpl *CustomTemplate) GetApplicationsByState() (applicationsByState map[St
 	newAppAmmount := 0
 	log.Debugf("Application template obj: %+v", tmpl)
 	for _, application := range tmpl.Applications {
-		application.Application.TemplateID = tmpl.TemplateID
+		application.Application.HostID = tmpl.TemplateID
 		applicationsByState[application.State] = append(applicationsByState[application.State], application.Application)
 		if StateName[application.State] == "New" || StateName[application.State] == "Updated" {
 			newAppAmmount++

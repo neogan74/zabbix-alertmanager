@@ -309,7 +309,9 @@ func MapsToStructs(Maps []map[string]interface{}, SlicePointer interface{}, conv
 func MapsToStructs2(Maps []interface{}, SlicePointer interface{}, converter Converter, tag string) {
 	m := make([]map[string]interface{}, len(Maps))
 	for index, i := range Maps {
+		fmt.Printf("----------------MapsToStruct2: index %+v, i: %+v\n\n", index, i)
 		m[index] = i.(map[string]interface{})
 	}
+	fmt.Printf("----------------MapsToStruct2:  m: %+v %+v %+v %+v\n\n", m, SlicePointer, converter, tag)
 	MapsToStructs(m, SlicePointer, converter, tag)
 }

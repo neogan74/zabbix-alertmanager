@@ -9,7 +9,6 @@ type Application struct {
 	ApplicationID string `json:"applicationid,omitempty"`
 	HostID        string `json:"hostid"`
 	Name          string `json:"name"`
-	TemplateID    string `json:"templateid,omitempty"`
 }
 
 //Applications slice of Application struct
