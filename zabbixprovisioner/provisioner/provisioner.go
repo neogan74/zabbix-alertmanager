@@ -361,7 +361,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 			HostGroup: zabbixHostGroup,
 		})
 	}
-	log.Debugf("Zabbix HGs: %+v", zabbixHostGroups)
+	// log.Debugf("Zabbix HGs: %+v", zabbixHostGroups)
 
 	// Getting ZABBIX TEMPLATES //
 
@@ -441,7 +441,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 				newItem.Applications[zabbixApplication.Name] = struct{}{}
 			}
 
-			log.Debugf("Loading item from Zabbix: %+v", newItem)
+			// log.Debugf("Loading item from Zabbix: %+v", newItem)
 			oldTemplate.AddItem(newItem)
 		}
 
@@ -460,14 +460,14 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 				Trigger: zabbixTrigger,
 			}
 
-			log.Debugf("Loading trigger from Zabbix: %+v", newTrigger)
+			// log.Debugf("Loading trigger from Zabbix: %+v", newTrigger)
 			oldTemplate.AddTrigger(newTrigger)
 		}
 	}
 	/// Geting ZABBIX HOSTS
 	hgids := make([]string, 1)
 	for _, hg := range p.HostGroups {
-		log.Debugf("HG: %v %s ", hg, hg.GroupID)
+		// log.Debugf("HG: %v %s ", hg, hg.GroupID)
 		hgids = append(hgids, hg.GroupID)
 	}
 
@@ -478,7 +478,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 	if err != nil {
 		return errors.Wrapf(err, "error getting hosts: %v", hostNames)
 	}
-	log.Debugf("HOSTS from ZABBIXfor HGids: %+v %+v\n", hgids, zabbixHosts)
+	// log.Debugf("HOSTS from ZABBIXfor HGids: %+v %+v\n", hgids, zabbixHosts)
 
 	for _, zabbixHost := range zabbixHosts {
 		zabbixHostGroups, err := p.api.HostGroupsGet(zabbix.Params{
@@ -492,9 +492,9 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 		hostGroups := make(map[string]struct{}, len(zabbixHostGroups))
 		for _, zabbixHostGroup := range zabbixHostGroups {
 			hostGroups[zabbixHostGroup.Name] = struct{}{}
-			log.Debugf("PHHHGGG: %+v\n", p.HostGroups["Prometheus"].State)
+			// log.Debugf("PHHHGGG: %+v\n", p.HostGroups["Prometheus"].State)
 		}
-		log.Debugf("HHHGGG: %+v\n\n\n", hostGroups)
+		// log.Debugf("HHHGGG: %+v\n\n\n", hostGroups)
 		// Remove hostid because the Zabbix api add it automatically and it breaks the comparison between new/old hosts
 		delete(zabbixHost.Inventory, "hostid")
 
@@ -518,7 +518,7 @@ func (p *Provisioner) ApplyChanges() error {
 	log.Debugln("===================================================================")
 	hostGroupsByState := p.GetHostGroupsByState()
 	if len(hostGroupsByState[StateNew]) != 0 {
-		log.Debugf("Creating HostGroups: %+v\n", hostGroupsByState[StateNew])
+		// log.Debugf("Creating HostGroups: %+v\n", hostGroupsByState[StateNew])
 		err := p.api.HostGroupsCreate(hostGroupsByState[StateNew])
 		if err != nil {
 			return errors.Wrap(err, "Failed in creating hostgroups")
@@ -546,14 +546,15 @@ func (p *Provisioner) ApplyChanges() error {
 			return errors.Wrap(err, "Failed in updating host")
 		}
 	}
-
+	templist := []string{}
 	log.Debugf("Updating tempalte, tempalteName: %s", p.Templates)
 	for _, template := range p.Templates {
+		templist = append(templist, template.TemplateID)
 		log.Debugf("Updating tempalte, tempalteName: %s", template.Name)
 
 		applicationsByState := template.GetApplicationsByState()
 		if len(applicationsByState[StateOld]) != 0 {
-			log.Debugf("Deleting applications: %+v\n", applicationsByState[StateOld])
+			// log.Debugf("Deleting applications: %+v\n", applicationsByState[StateOld])
 			err := p.api.ApplicationsDelete(applicationsByState[StateOld])
 			if err != nil {
 				return errors.Wrap(err, "Failed in deleting applications")
@@ -561,7 +562,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(applicationsByState[StateNew]) != 0 {
-			log.Debugf("Creating applications: %+v\n", applicationsByState[StateNew])
+			// log.Debugf("Creating applications: %+v\n", applicationsByState[StateNew])
 			err := p.api.ApplicationsCreate(applicationsByState[StateNew])
 			if err != nil {
 				return errors.Wrap(err, "Failed in creating applications")
@@ -573,7 +574,7 @@ func (p *Provisioner) ApplyChanges() error {
 		triggersByState := template.GetTriggersByState()
 
 		if len(triggersByState[StateOld]) != 0 {
-			log.Debugf("Deleting triggers: %+v\n", triggersByState[StateOld])
+			// log.Debugf("Deleting triggers: %+v\n", triggersByState[StateOld])
 			err := p.api.TriggersDelete(triggersByState[StateOld])
 			if err != nil {
 				return errors.Wrap(err, "Failed in deleting triggers")
@@ -581,7 +582,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(itemsByState[StateOld]) != 0 {
-			log.Debugf("Deleting items: %+v\n", itemsByState[StateOld])
+			// log.Debugf("Deleting items: %+v\n", itemsByState[StateOld])
 			err := p.api.ItemsDelete(itemsByState[StateOld])
 			if err != nil {
 				return errors.Wrap(err, "Failed in deleting items")
@@ -589,7 +590,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(itemsByState[StateUpdated]) != 0 {
-			log.Debugf("Updating items: %+v\n", itemsByState[StateUpdated])
+			// log.Debugf("Updating items: %+v\n", itemsByState[StateUpdated])
 			err := p.api.ItemsUpdate(itemsByState[StateUpdated])
 			if err != nil {
 				return errors.Wrap(err, "Failed in updating items")
@@ -597,7 +598,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(triggersByState[StateUpdated]) != 0 {
-			log.Debugf("Updating triggers: %+v\n", triggersByState[StateUpdated])
+			// log.Debugf("Updating triggers: %+v\n", triggersByState[StateUpdated])
 			err := p.api.TriggersUpdate(triggersByState[StateUpdated])
 			if err != nil {
 				return errors.Wrap(err, "Failed in updating triggers")
@@ -605,7 +606,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(itemsByState[StateNew]) != 0 {
-			log.Debugf("Creating items: %+v\n", itemsByState[StateNew])
+			// log.Debugf("Creating items: %+v\n", itemsByState[StateNew])
 			err := p.api.ItemsCreate(itemsByState[StateNew])
 			if err != nil {
 				return errors.Wrap(err, "Failed in creating items")
@@ -613,7 +614,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(triggersByState[StateNew]) != 0 {
-			log.Debugf("Creating triggers: %+v\n", triggersByState[StateNew])
+			// log.Debugf("Creating triggers: %+v\n", triggersByState[StateNew])
 			err := p.api.TriggersCreate(triggersByState[StateNew])
 			if err != nil {
 				return errors.Wrap(err, "Failed in creating triggers")
@@ -648,7 +649,7 @@ func (p *Provisioner) ApplyChanges() error {
 
 		applicationsByState := host.GetApplicationsByState()
 		if len(applicationsByState[StateOld]) != 0 {
-			log.Debugf("Deleting applications: %+v\n", applicationsByState[StateOld])
+			// log.Debugf("Deleting applications: %+v\n", applicationsByState[StateOld])
 			err := p.api.ApplicationsDelete(applicationsByState[StateOld])
 			if err != nil {
 				return errors.Wrap(err, "Failed in deleting applications")
@@ -656,7 +657,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(applicationsByState[StateNew]) != 0 {
-			log.Debugf("Creating applications: %+v\n", applicationsByState[StateNew])
+			// log.Debugf("Creating applications: %+v\n", applicationsByState[StateNew])
 			err := p.api.ApplicationsCreate(applicationsByState[StateNew])
 			if err != nil {
 				return errors.Wrap(err, "Failed in creating applications")
@@ -668,7 +669,7 @@ func (p *Provisioner) ApplyChanges() error {
 		triggersByState := host.GetTriggersByState()
 
 		if len(triggersByState[StateOld]) != 0 {
-			log.Debugf("Deleting triggers: %+v\n", triggersByState[StateOld])
+			// log.Debugf("Deleting triggers: %+v\n", triggersByState[StateOld])
 			err := p.api.TriggersDelete(triggersByState[StateOld])
 			if err != nil {
 				return errors.Wrap(err, "Failed in deleting triggers")
@@ -676,7 +677,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(itemsByState[StateOld]) != 0 {
-			log.Debugf("Deleting items: %+v\n", itemsByState[StateOld])
+			// log.Debugf("Deleting items: %+v\n", itemsByState[StateOld])
 			err := p.api.ItemsDelete(itemsByState[StateOld])
 			if err != nil {
 				return errors.Wrap(err, "Failed in deleting items")
@@ -684,7 +685,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(itemsByState[StateUpdated]) != 0 {
-			log.Debugf("Updating items: %+v\n", itemsByState[StateUpdated])
+			// log.Debugf("Updating items: %+v\n", itemsByState[StateUpdated])
 			err := p.api.ItemsUpdate(itemsByState[StateUpdated])
 			if err != nil {
 				return errors.Wrap(err, "Failed in updating items")
@@ -692,7 +693,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(triggersByState[StateUpdated]) != 0 {
-			log.Debugf("Updating triggers: %+v\n", triggersByState[StateUpdated])
+			// log.Debugf("Updating triggers: %+v\n", triggersByState[StateUpdated])
 			err := p.api.TriggersUpdate(triggersByState[StateUpdated])
 			if err != nil {
 				return errors.Wrap(err, "Failed in updating triggers")
@@ -700,7 +701,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(itemsByState[StateNew]) != 0 {
-			log.Debugf("Creating items: %+v\n", itemsByState[StateNew])
+			// log.Debugf("Creating items: %+v\n", itemsByState[StateNew])
 			err := p.api.ItemsCreate(itemsByState[StateNew])
 			if err != nil {
 				return errors.Wrap(err, "Failed in creating items")
@@ -708,7 +709,7 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 
 		if len(triggersByState[StateNew]) != 0 {
-			log.Debugf("Creating triggers: %+v\n", triggersByState[StateNew])
+			// log.Debugf("Creating triggers: %+v\n", triggersByState[StateNew])
 			err := p.api.TriggersCreate(triggersByState[StateNew])
 			if err != nil {
 				return errors.Wrap(err, "Failed in creating triggers")
@@ -718,8 +719,13 @@ func (p *Provisioner) ApplyChanges() error {
 	}
 	log.Debugf("HOSTLIST: %+v\n", hostlist, p.Templates)
 	templateUpd, err := p.api.TemplateUpdate(zabbix.Params{
-		"templateid": "10333",
-		"hostids":    hostlist,
+		// "templateid": templist[0],
+		"templateid": "10334",
+		"hosts": []map[string]string{
+			0: {"hostid": "10347"},
+			1: {"hostid": "10348"},
+			2: {"hostid": "10353"},
+		},
 	})
 	if err != nil {
 		return errors.Wrap(err, "Failed in updating template")

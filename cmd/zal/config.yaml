@@ -19,7 +19,7 @@
 
 - name: prom2zbx2
   hostGroups:
-    - Prometheus2
+    - Prometheus
   templateHostGroups:
     - Template/prom2zabbix
   # tag and deploymentStatus are inventory fields currently supported for an host
