@@ -17,6 +17,11 @@ type Template struct {
 	GroupIds HostGroupIDs `json:"groups,omitempty"`
 }
 
+//HostGroupID ...
+type TemplateID struct {
+	TemplateID string `json:"templateids"`
+}
+
 // Templates ..
 type Templates []Template
 
@@ -59,4 +64,15 @@ func (api *API) TemplatesUpdate(tmpls Templates) error {
 		return err
 	}
 	return nil
+}
+
+//TemplateUpdate ...
+func (api *API) TemplateUpdate(params Params) (Response, error) {
+	// var res []TemplateID
+	resp, err := api.CallWithError("template.update", params)
+	if err != nil {
+		return resp, err
+	}
+	// reflector.MapsToStructs(resp.Result.([]map[string]interface{}), &res, reflector.Strconv, "json")
+	return resp, nil
 }

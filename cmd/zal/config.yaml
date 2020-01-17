@@ -14,4 +14,23 @@
   itemDefaultTrends: 5d
   itemDefaultTrapperHosts: # Hosts permitted to send data (your webhook external CIDR, default is from everywhere)
   # Path to the alerts containing folder
+  prometheusUrl: 51.15.213.9:9090
+  alertsDir: .\rules.d\
+
+- name: prom2zbx2
+  hostGroups:
+    - Prometheus2
+  templateHostGroups:
+    - Template/prom2zabbix
+  # tag and deploymentStatus are inventory fields currently supported for an host
+  tag: prometheus
+  deploymentStatus: 0
+  # itemDefault* below, defines item values when not specified in a rule
+  itemDefaultApplication: prometheus
+  # For history and trends in zabbix 2.x you have to put those in days like 7 or 90
+  itemDefaultHistory: 5d
+  itemDefaultTrends: 5d
+  itemDefaultTrapperHosts: # Hosts permitted to send data (your webhook external CIDR, default is from everywhere)
+  # Path to the alerts containing folder
+  prometheusUrl: 51.15.213.9:9099
   alertsDir: .\rules.d\

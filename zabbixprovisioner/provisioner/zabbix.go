@@ -301,6 +301,7 @@ func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 	updatedHost = host
 
 	if existing, ok := z.Hosts[host.Name]; ok {
+		log.Debugf("=!+!=!+!=!+UPDATED MFC host = State: %v, Expression: %v", existing, host)
 		if existing.Equal(host) {
 			if host.State == StateOld {
 				existing.HostID = host.HostID
@@ -312,6 +313,7 @@ func (z *CustomZabbix) AddHost(host *CustomHost) (updatedHost *CustomHost) {
 				existing.HostID = host.HostID
 			}
 			existing.State = StateUpdated
+			log.Debugf("=+=+=+UPDATED MFC host = State: %s, Expression: %s", existing)
 			updatedHost = existing
 		}
 	}

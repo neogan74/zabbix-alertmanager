@@ -29,6 +29,7 @@ type HostConfig struct {
 	ItemDefaultTrapperHosts string            `yaml:"itemDefaultTrapperHosts"`
 	HostAlertsDir           string            `yaml:"alertsDir"`
 	TriggerTags             map[string]string `yaml:"triggerTags"`
+	PrometheusUrl           string            `yaml:"prometheusUrl"`
 }
 
 //Targets structure for Prometheus api/v1/targets resposce
@@ -129,16 +130,15 @@ func (p *Provisioner) Run() error {
 		if err := p.LoadTargetsFromPrometheus(host); err != nil {
 			return errors.Wrapf(err, "error loading prometheus targets from given URL: %s", p.prometheusURL)
 		}
-	}
 
-	if err := p.LoadDataFromZabbix(); err != nil {
-		return errors.Wrap(err, "error loading zabbix rules")
-	}
+		if err := p.LoadDataFromZabbix(); err != nil {
+			return errors.Wrap(err, "error loading zabbix rules")
+		}
 
-	if err := p.ApplyChanges(); err != nil {
-		return errors.Wrap(err, "error applying changes")
+		if err := p.ApplyChanges(); err != nil {
+			return errors.Wrap(err, "error applying changes")
+		}
 	}
-
 	return nil
 }
 
@@ -148,7 +148,7 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 	log.Debugln("=======================LoadTargetsFromPrometheus=====================")
 	log.Debugln("===================================================================")
 	targetsPath := "/api/v1/targets"
-	promURL := fmt.Sprintf("%s%s", p.prometheusURL, targetsPath)
+	promURL := fmt.Sprintf("%s%s%s", "http://", hostConfig.PrometheusUrl, targetsPath)
 	resp, err := http.Get(promURL)
 	if err != nil {
 		log.Infof("Error while get targets: %v\n", err)
@@ -174,14 +174,10 @@ func (p *Provisioner) LoadTargetsFromPrometheus(hostConfig HostConfig) error {
 		newHost := &CustomHost{
 			State: StateNew,
 			Host: zabbix.Host{
-				Host:          trg,
-				Available:     1,
-				Name:          trg,
-				Status:        0,
-				InventoryMode: zabbix.InventoryManual,
-				Inventory: map[string]string{
-					"tag": "Prom2zbx",
-				},
+				Host:      string(trg),
+				Available: 1,
+				Name:      trg,
+				Status:    0,
 				Interfaces: zabbix.HostInterfaces{
 					zabbix.HostInterface{
 						DNS:   "",
@@ -477,7 +473,7 @@ func (p *Provisioner) LoadDataFromZabbix() error {
 
 	zabbixHosts, err := p.api.HostsGet(zabbix.Params{
 		"output":   "extend",
-		"groupids": "23",
+		"groupids": p.HostGroups["Prometheus"].GroupID,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "error getting hosts: %v", hostNames)
@@ -551,8 +547,9 @@ func (p *Provisioner) ApplyChanges() error {
 		}
 	}
 
+	log.Debugf("Updating tempalte, tempalteName: %s", p.Templates)
 	for _, template := range p.Templates {
-		log.Debugf("Updating host, hostName: %s", template.Name)
+		log.Debugf("Updating tempalte, tempalteName: %s", template.Name)
 
 		applicationsByState := template.GetApplicationsByState()
 		if len(applicationsByState[StateOld]) != 0 {
@@ -625,6 +622,7 @@ func (p *Provisioner) ApplyChanges() error {
 	}
 
 	hostsByState := p.GetHostsByState()
+	log.Debugf("=+=+=+=hostsByState :%v", hostsByState)
 	if len(hostsByState[StateNew]) != 0 {
 		log.Debugf("Creating Hosts: %+v\n", hostsByState[StateNew])
 		err := p.api.HostsCreate(hostsByState[StateNew])
@@ -643,9 +641,10 @@ func (p *Provisioner) ApplyChanges() error {
 			return errors.Wrap(err, "Failed in updating host")
 		}
 	}
-
+	hostlist := []map[string]string{}
 	for _, host := range p.Hosts {
-		log.Debugf("Updating host, hostName: %s", host.Name)
+		log.Debugf("Updating host, hostName: %s %s", host.Name, host.HostID)
+		hostlist = append(hostlist, map[string]string{"hostid": host.HostID})
 
 		applicationsByState := host.GetApplicationsByState()
 		if len(applicationsByState[StateOld]) != 0 {
@@ -715,6 +714,16 @@ func (p *Provisioner) ApplyChanges() error {
 				return errors.Wrap(err, "Failed in creating triggers")
 			}
 		}
+
 	}
+	log.Debugf("HOSTLIST: %+v\n", hostlist, p.Templates)
+	templateUpd, err := p.api.TemplateUpdate(zabbix.Params{
+		"templateid": "10333",
+		"hostids":    hostlist,
+	})
+	if err != nil {
+		return errors.Wrap(err, "Failed in updating template")
+	}
+	log.Debugf("HOSTLIST: %+v\n", templateUpd)
 	return nil
 }
